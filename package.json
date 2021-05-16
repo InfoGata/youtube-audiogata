@@ -1,0 +1,23 @@
+{
+  "name": "audio-pwa-youtube",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^0.21.1",
+    "iso8601-duration": "^1.3.0",
+    "parcel-bundler": "^1.12.5",
+    "ytdl-core": "^4.0.5"
+  },
+  "scripts": {
+    "build": "npx parcel build src/* --out-dir dist/ --no-source-maps"
+  },
+  "devDependencies": {
+    "typescript": "^4.2.3"
+  },
+  "browserslist": [
+    "last 1 Chrome version"
+  ]
+}
