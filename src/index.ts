@@ -239,6 +239,7 @@ interface Application {
   getPlaylistTracks?: (playlist: IPlaylist) => Promise<void>;
   postUiMessage: (msg: any) => Promise<void>;
   onUiMessage?: (message: any) => void;
+  networkRequest(input: RequestInfo, init?: RequestInit): Promise<Response>;
 };
 
 declare var application: Application;
@@ -246,3 +247,6 @@ declare var application: Application;
 application.searchAll = funcs.searchAll;
 application.getTrackUrl = funcs.getTrackUrl;
 
+window.fetch = function() {
+  return application.networkRequest.apply(this, arguments);
+}
