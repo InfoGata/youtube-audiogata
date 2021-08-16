@@ -3,5 +3,5 @@
   "api": "1.0.0",
   "script": "dist/index.js",
   "options": "dist/options.html",
-  "description": "Youtube Audio-PWA plugin"
+  "description": "Youtube Audiogata plugin"
 }
