@@ -52,9 +52,7 @@ export interface IImage {
 
 export interface ISearchApi {
   name: string;
-  searchAll: (
-    query: string,
-  ) => Promise<{
+  searchAll: (query: string) => Promise<{
     tracks?: ISong[];
     albums?: IAlbum[];
     artists?: IArtist[];
@@ -109,8 +107,10 @@ interface IYoutubePlaylistItemDetails {
 const key = "AIzaSyASG5R6Ea6lRT99-GLa2TwbPz5Md7aFL3g";
 const corsProxyUrl = "localhost";
 
-function playlistResultToPlaylistYoutube(result: IYoutubeSearchResult): IPlaylist[] {
-  return result.items.map(r => ({
+function playlistResultToPlaylistYoutube(
+  result: IYoutubeSearchResult
+): IPlaylist[] {
+  return result.items.map((r) => ({
     apiId: r.id.playlistId,
     from: "youtube",
     name: r.snippet.title,
@@ -121,7 +121,7 @@ function playlistResultToPlaylistYoutube(result: IYoutubeSearchResult): IPlaylis
 function resultToSongYoutube(result: IYoutubeResult): ISong[] {
   const items = result.items;
   return items.map(
-    i =>
+    (i) =>
       ({
         apiId: i.id,
         duration: toSeconds(parse(i.contentDetails.duration)),
@@ -132,7 +132,7 @@ function resultToSongYoutube(result: IYoutubeResult): ISong[] {
           i.snippet.thumbnails.high,
         ],
         name: i.snippet.title,
-      } as ISong),
+      } as ISong)
   );
 }
 
@@ -149,8 +149,8 @@ async function getYoutubePlaylistTracks(playlist: IPlaylist): Promise<ISong[]> {
   const urlWithQuery = `${url}?part=contentDetails&maxResults=50&key=${key}&playlistId=${playlist.apiId}`;
   const result = await axios.get<IYoutubePlaylistItemResult>(urlWithQuery);
   const detailsUrl = "https://www.googleapis.com/youtube/v3/videos";
-  const ids = result.data.items.map(i => i.contentDetails.videoId).join(',');
-  const detailsUrlWithQuery = `${detailsUrl}?key=${key}&part=snippet,contentDetails&id=${ids}`
+  const ids = result.data.items.map((i) => i.contentDetails.videoId).join(",");
+  const detailsUrlWithQuery = `${detailsUrl}?key=${key}&part=snippet,contentDetails&id=${ids}`;
   const detailsResults = await axios.get<IYoutubeResult>(detailsUrlWithQuery);
   return resultToSongYoutube(detailsResults.data);
 }
@@ -162,44 +162,48 @@ async function searchPlaylists(query: string): Promise<IPlaylist[]> {
 async function searchYoutubePlaylists(query: string): Promise<IPlaylist[]> {
   const url = "https://www.googleapis.com/youtube/v3/search";
   const urlWithQuery = `${url}?part=snippet&type=playlist&maxResults=50&key=${key}&q=${encodeURIComponent(
-    query,
+    query
   )}`;
   const result = await axios.get<IYoutubeSearchResult>(urlWithQuery);
   return playlistResultToPlaylistYoutube(result.data);
 }
 
-
 async function searchYoutube(query: string): Promise<ISong[]> {
   const url = "https://www.googleapis.com/youtube/v3/search";
-  const urlWithQuery = `${url}?part=id&type=video&maxResults=50&key=${
-    key
-    }&q=${encodeURIComponent(query)}`;
+  const urlWithQuery = `${url}?part=id&type=video&maxResults=50&key=${key}&q=${encodeURIComponent(
+    query
+  )}`;
   const results = await axios.get<IYoutubeSearchResult>(urlWithQuery);
   const detailsUrl = "https://www.googleapis.com/youtube/v3/videos";
-  const ids = results.data.items.map(i => i.id.videoId).join(',');
-  const detailsUrlWithQuery = `${detailsUrl}?key=${key}&part=snippet,contentDetails&id=${ids}`
+  const ids = results.data.items.map((i) => i.id.videoId).join(",");
+  const detailsUrlWithQuery = `${detailsUrl}?key=${key}&part=snippet,contentDetails&id=${ids}`;
   const detailsResults = await axios.get<IYoutubeResult>(detailsUrlWithQuery);
   return resultToSongYoutube(detailsResults.data);
 }
 
-
 async function getYoutubeTrack(song: ISong): Promise<string> {
-  const info = await ytdl.getInfo(song.apiId || "", {
-    requestOptions: {
-      transform: (parsed: any) => {
-        parsed.protocol = "http:";
-        return {
-          headers: { Host: parsed.host },
-          host: corsProxyUrl,
-          path: "/http://youtube.com" + parsed.path,
-          maxRedirects: 10,
-          port: 8085,
-          protocol: "http:",
-        };
-      },
-    },
+  const corsDisabled = await application.isNetworkRequestCorsDisabled();
+
+  const info = corsDisabled
+    ? await ytdl.getInfo(song.apiId || "")
+    : await ytdl.getInfo(song.apiId || "", {
+        requestOptions: {
+          transform: (parsed: any) => {
+            parsed.protocol = "http:";
+            return {
+              headers: { Host: parsed.host },
+              host: corsProxyUrl,
+              path: "/http://youtube.com" + parsed.path,
+              maxRedirects: 10,
+              port: 8085,
+              protocol: "http:",
+            };
+          },
+        },
+      });
+  const formatInfo = ytdl.chooseFormat(info.formats, {
+    quality: "highestaudio",
   });
-  const formatInfo = ytdl.chooseFormat(info.formats, { quality: 'highestaudio' });
   return formatInfo.url;
 }
 
@@ -224,9 +228,8 @@ const funcs = {
   },
   async getTrackUrl(song: ISong): Promise<string> {
     return getYoutubeTrack(song);
-  }
-} as IFormatTrackApi & ISearchApi
-
+  },
+} as IFormatTrackApi & ISearchApi;
 
 interface Application {
   searchAll?: (query: string) => Promise<{
@@ -240,13 +243,14 @@ interface Application {
   postUiMessage: (msg: any) => Promise<void>;
   onUiMessage?: (message: any) => void;
   networkRequest(input: RequestInfo, init?: RequestInit): Promise<Response>;
-};
+  isNetworkRequestCorsDisabled: () => Promise<boolean>;
+}
 
 declare var application: Application;
 
 application.searchAll = funcs.searchAll;
 application.getTrackUrl = funcs.getTrackUrl;
 
-window.fetch = function() {
+window.fetch = function () {
   return application.networkRequest.apply(this, arguments);
-}
+};
