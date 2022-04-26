@@ -11,7 +11,8 @@
     "ytdl-core": "^4.9.2"
   },
   "scripts": {
-    "build": "parcel build src/* --dist-dir dist/ --no-source-maps"
+    "build": "parcel build src/index.ts src/options.html --dist-dir dist/ --no-source-maps",
+    "start": "parcel src/index.ts src/options.html --dist-dir dist/ --no-source-maps"
   },
   "devDependencies": {
     "buffer": "^6.0.3",
