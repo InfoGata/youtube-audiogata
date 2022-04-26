@@ -1,111 +1,19 @@
 import axios from "axios";
 import { parse, toSeconds } from "iso8601-duration";
 import ytdl from "ytdl-core";
+import {
+  IYoutubeSearchResult,
+  IPlaylist,
+  IYoutubeResult,
+  ISong,
+  IYoutubePlaylistItemResult,
+  IAlbum,
+  IArtist,
+  Application,
+} from "./types";
 
-export interface IFormatTrackApi {
-  getTrackUrl: (song: ISong) => Promise<string>;
-}
-
-export interface ISong {
-  id?: string;
-  name: string;
-  source: string;
-  from?: string;
-  apiId?: string;
-  duration?: number;
-  albumId?: string;
-  artistId?: string;
-  artistName?: string;
-  images: IImage[];
-}
-
-export interface IAlbum {
-  name: string;
-  apiId: string;
-  from: string;
-  artistName?: string;
-  artistId?: string;
-  images: IImage[];
-}
-
-export interface IArtist {
-  name: string;
-  apiId: string;
-  from: string;
-  images: IImage[];
-}
-
-export interface IPlaylist {
-  id?: string;
-  name: string;
-  songs: ISong[];
-  apiId?: string;
-  images?: IImage[];
-  from?: string;
-}
-
-export interface IImage {
-  url: string;
-  height: number;
-  width: number;
-}
-
-export interface ISearchApi {
-  name: string;
-  searchAll: (query: string) => Promise<{
-    tracks?: ISong[];
-    albums?: IAlbum[];
-    artists?: IArtist[];
-    playlists?: IPlaylist[];
-  }>;
-  getAlbumTracks: (album: IAlbum) => Promise<ISong[]>;
-  getPlaylistTracks: (playlist: IPlaylist) => Promise<ISong[]>;
-  getArtistAlbums: (artist: IArtist) => Promise<IAlbum[]>;
-}
-
-interface IYoutubeSearchResult {
-  items: IYoutubeSearchResultItem[];
-}
-interface IYoutubeSearchResultItem {
-  id: IYoutubeItemId;
-  snippet: IYoutubeItemSnippet;
-}
-interface IYoutubeItemId {
-  videoId: string;
-  playlistId: string;
-}
-interface IYoutubeResult {
-  items: IYoutubeItem[];
-}
-interface IYoutubeItem {
-  id: string;
-  snippet: IYoutubeItemSnippet;
-  contentDetails: IYoutubeContentDetails;
-}
-interface IYoutubeItemSnippet {
-  title: string;
-  thumbnails: IYoutubeThumbnails;
-}
-interface IYoutubeThumbnails {
-  default: IImage;
-  medium: IImage;
-  high: IImage;
-}
-interface IYoutubeContentDetails {
-  duration: string;
-}
-interface IYoutubePlaylistItemResult {
-  items: IYoutubePlaylistItemItem[];
-}
-interface IYoutubePlaylistItemItem {
-  contentDetails: IYoutubePlaylistItemDetails;
-}
-interface IYoutubePlaylistItemDetails {
-  videoId: string;
-}
-
+declare var application: Application;
 const key = "AIzaSyASG5R6Ea6lRT99-GLa2TwbPz5Md7aFL3g";
-const corsProxyUrl = "localhost";
 
 function playlistResultToPlaylistYoutube(
   result: IYoutubeSearchResult
@@ -183,24 +91,35 @@ async function searchYoutube(query: string): Promise<ISong[]> {
 
 async function getYoutubeTrack(song: ISong): Promise<string> {
   const corsDisabled = await application.isNetworkRequestCorsDisabled();
+  let info: ytdl.videoInfo;
 
-  const info = corsDisabled
-    ? await ytdl.getInfo(song.apiId || "")
-    : await ytdl.getInfo(song.apiId || "", {
+  if (corsDisabled) {
+    info = await ytdl.getInfo(song.apiId || "");
+  } else {
+    const proxy = await application.getCorsProxy();
+    if (proxy) {
+      const url = new URL(proxy);
+      info = await ytdl.getInfo(song.apiId || "", {
         requestOptions: {
           transform: (parsed: any) => {
-            parsed.protocol = "http:";
+            parsed.protocol = url.protocol;
             return {
               headers: { Host: parsed.host },
-              host: corsProxyUrl,
+              host: url.hostname,
               path: "/http://youtube.com" + parsed.path,
               maxRedirects: 10,
-              port: 8085,
-              protocol: "http:",
+              port: url.port,
+              protocol: url.protocol,
             };
           },
         },
       });
+    } else {
+      // Try anyway
+      info = await ytdl.getInfo(song.apiId || "");
+    }
+  }
+
   const formatInfo = ytdl.chooseFormat(info.formats, {
     quality: "highestaudio",
   });
@@ -229,24 +148,7 @@ const funcs = {
   async getTrackUrl(song: ISong): Promise<string> {
     return getYoutubeTrack(song);
   },
-} as IFormatTrackApi & ISearchApi;
-
-interface Application {
-  searchAll?: (query: string) => Promise<{
-    tracks?: ISong[];
-    albums?: IAlbum[];
-    artists?: IArtist[];
-    playlists?: IPlaylist[];
-  }>;
-  getTrackUrl?: (song: ISong) => Promise<string>;
-  getPlaylistTracks?: (playlist: IPlaylist) => Promise<void>;
-  postUiMessage: (msg: any) => Promise<void>;
-  onUiMessage?: (message: any) => void;
-  networkRequest(input: RequestInfo, init?: RequestInit): Promise<Response>;
-  isNetworkRequestCorsDisabled: () => Promise<boolean>;
-}
-
-declare var application: Application;
+};
 
 application.searchAll = funcs.searchAll;
 application.getTrackUrl = funcs.getTrackUrl;
