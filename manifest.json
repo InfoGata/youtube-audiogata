@@ -1,7 +1,6 @@
 {
-  "name": "Youtube Plugin",
-  "api": "1.0.0",
+  "name": "Plugin for Youtube",
   "script": "dist/index.js",
   "options": "dist/options.html",
-  "description": "Youtube Audiogata plugin"
+  "description": "Plugin for playiing music from youtube.com"
 }
