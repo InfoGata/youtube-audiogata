@@ -4,18 +4,10 @@
   <title>Options</title>
 </head>
 <body>
-  Yeah
-  <button name="time">
-    Lets go
-  </button>
-</body>
-<script>
-    parent.postMessage("tester", "*");
-    console.log("here we go");
-    const elements = document.getElementsByName("time");
-    elements[0].onclick = () => {
-      window.open("https://www.google.com");
-    }
-</script>
-</html>
+  <script type="module">
+    import { init } from "./options.tsx";
 
+    init();
+  </script>
+</body>
+</html>

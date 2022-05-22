@@ -93,8 +93,11 @@ export interface Application {
   getTrackUrl?: (song: ISong) => Promise<string>;
   getPlaylistTracks?: (playlist: IPlaylist) => Promise<void>;
   postUiMessage: (msg: any) => Promise<void>;
+  onDeepLinkMessage: (message: string) => Promise<void>;
   onUiMessage?: (message: any) => void;
   networkRequest(input: RequestInfo, init?: RequestInit): Promise<Response>;
   isNetworkRequestCorsDisabled: () => Promise<boolean>;
   getCorsProxy: () => Promise<string>;
+  getPluginId: () => Promise<string>;
+  getUserPlaylists?: () => Promise<IPlaylist[]>;
 }

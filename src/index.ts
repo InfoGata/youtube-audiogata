@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosRequestConfig } from "axios";
 import { parse, toSeconds } from "iso8601-duration";
 import ytdl from "ytdl-core";
 import {
@@ -14,6 +14,53 @@ import {
 
 declare var application: Application;
 const key = "AIzaSyASG5R6Ea6lRT99-GLa2TwbPz5Md7aFL3g";
+let accessToken: string = "";
+
+const getRequestConfig = () => {
+  const config: AxiosRequestConfig = {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  };
+  return config;
+};
+
+const sendOrigin = async () => {
+  const host = document.location.host;
+  const hostArray = host.split(".");
+  hostArray.shift();
+  const domain = hostArray.join(".");
+  const origin = `${document.location.protocol}//${domain}`;
+  const pluginId = await application.getPluginId();
+  application.postUiMessage({
+    type: "origin",
+    origin: origin,
+    pluginId: pluginId,
+  });
+};
+
+application.onUiMessage = async (message: any) => {
+  console.log("why", message);
+  switch (message.type) {
+    case "check-login":
+      accessToken = localStorage.getItem("access_token");
+      if (accessToken) {
+        application.postUiMessage({ type: "login", accessToken: accessToken });
+      }
+      await sendOrigin();
+      break;
+    case "login":
+      accessToken = message.accessToken;
+      localStorage.setItem("access_token", accessToken);
+      application.getUserPlaylists = getUserPlaylists;
+      break;
+    case "logout":
+      localStorage.removeItem("access_token");
+      accessToken = null;
+      application.getUserPlaylists = undefined;
+      break;
+  }
+};
 
 function playlistResultToPlaylistYoutube(
   result: IYoutubeSearchResult
@@ -42,6 +89,15 @@ function resultToSongYoutube(result: IYoutubeResult): ISong[] {
         name: i.snippet.title,
       } as ISong)
   );
+}
+
+async function getUserPlaylists(): Promise<IPlaylist[]> {
+  const url =
+    "https://developers.google.com/apis-explorer/#p/youtube/v3/youtube.playlists.list";
+  const urlWithQuery = `${url}?part=snippet,contentDetails&mine=true&key=${key}`;
+  const result = await axios.get(urlWithQuery, getRequestConfig());
+  console.log(result);
+  return [];
 }
 
 async function searchTracks(query: string): Promise<ISong[]> {
@@ -153,6 +209,19 @@ const funcs = {
 application.searchAll = funcs.searchAll;
 application.getTrackUrl = funcs.getTrackUrl;
 
+application.onDeepLinkMessage = async (message: string) => {
+  application.postUiMessage({ type: "deeplink", url: message });
+};
+
 window.fetch = function () {
   return application.networkRequest.apply(this, arguments);
 };
+
+const init = () => {
+  accessToken = localStorage.getItem("access_token");
+  if (accessToken) {
+    application.getUserPlaylists = getUserPlaylists;
+  }
+};
+
+init();
