@@ -27,13 +27,17 @@ export interface IArtist {
   images: IImage[];
 }
 
-export interface IPlaylist {
-  id?: string;
-  name: string;
+export interface IPlaylist extends PlaylistInfo {
   songs: ISong[];
   apiId?: string;
-  images?: IImage[];
   from?: string;
+}
+
+export interface PlaylistInfo {
+  id?: string;
+  images?: IImage[];
+  name?: string;
+  isUserPlaylist?: boolean;
 }
 
 export interface IImage {
@@ -44,6 +48,15 @@ export interface IImage {
 
 export interface IYoutubeSearchResult {
   items: IYoutubeSearchResultItem[];
+}
+
+export interface IPlaylistResult {
+  items: IYoutubePlaylistResult[];
+}
+
+export interface IYoutubePlaylistResult {
+  id: string;
+  snippet: IYoutubeItemSnippet;
 }
 export interface IYoutubeSearchResultItem {
   id: IYoutubeItemId;
@@ -91,7 +104,7 @@ export interface Application {
     playlists?: IPlaylist[];
   }>;
   getTrackUrl?: (song: ISong) => Promise<string>;
-  getPlaylistTracks?: (playlist: IPlaylist) => Promise<void>;
+  getPlaylistTracks?: (playlist: IPlaylist) => Promise<ISong[]>;
   postUiMessage: (msg: any) => Promise<void>;
   onDeepLinkMessage: (message: string) => Promise<void>;
   onUiMessage?: (message: any) => void;
