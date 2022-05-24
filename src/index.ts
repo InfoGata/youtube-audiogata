@@ -177,9 +177,10 @@ async function getPlaylistTracks(playlist: IPlaylist): Promise<ISong[]> {
   if (playlist.isUserPlaylist) {
     urlWithQuery += "&mine=true";
   }
+  const config = playlist.isUserPlaylist ? getRequestConfig() : undefined;
   const result = await axios.get<IYoutubePlaylistItemResult>(
     urlWithQuery,
-    getRequestConfig()
+    config
   );
   const detailsUrl = "https://www.googleapis.com/youtube/v3/videos";
   const ids = result.data.items.map((i) => i.contentDetails.videoId).join(",");
