@@ -3,15 +3,15 @@ import { parse, toSeconds } from "iso8601-duration";
 import ytdl from "ytdl-core";
 import { getAuthUrl, REDIRECT_PATH } from "./shared";
 import {
-  IYoutubeSearchResult,
   IPlaylist,
-  IYoutubeResult,
   ISong,
-  IYoutubePlaylistItemResult,
-  IAlbum,
-  IArtist,
   Application,
-  IPlaylistResult,
+  SearchRequest,
+  SearchAllResult,
+  SearchTrackResult,
+  SearchPlaylistResult,
+  PlaylistTrackRequest,
+  UserPlaylistRequest,
 } from "./types";
 declare var application: Application;
 
@@ -94,10 +94,11 @@ application.onUiMessage = async (message: any) => {
   }
 };
 
-function playlistResultToPlaylist(result: IPlaylistResult): IPlaylist[] {
+function playlistResultToPlaylist(
+  result: GoogleAppsScript.YouTube.Schema.PlaylistListResponse
+): IPlaylist[] {
   return result.items.map((r) => ({
     apiId: r.id,
-    from: "youtube",
     name: r.snippet.title,
     images: [
       {
@@ -112,7 +113,7 @@ function playlistResultToPlaylist(result: IPlaylistResult): IPlaylist[] {
 }
 
 function playlistSearchResultToPlaylist(
-  result: IYoutubeSearchResult
+  result: GoogleAppsScript.YouTube.Schema.SearchListResponse
 ): IPlaylist[] {
   return result.items.map((r) => ({
     apiId: r.id.playlistId,
@@ -129,7 +130,9 @@ function playlistSearchResultToPlaylist(
   }));
 }
 
-function resultToSongYoutube(result: IYoutubeResult): ISong[] {
+function resultToSongYoutube(
+  result: GoogleAppsScript.YouTube.Schema.VideoListResponse
+): ISong[] {
   const items = result.items;
   return items.map(
     (i) =>
@@ -147,55 +150,147 @@ function resultToSongYoutube(result: IYoutubeResult): ISong[] {
   );
 }
 
-async function getUserPlaylists(): Promise<IPlaylist[]> {
+async function getUserPlaylists(
+  request: UserPlaylistRequest
+): Promise<SearchPlaylistResult> {
   const url = "https://www.googleapis.com/youtube/v3/playlists";
   const urlWithQuery = `${url}?part=snippet,contentDetails&mine=true&key=${key}`;
-  const result = await axios.get<IPlaylistResult>(
-    urlWithQuery,
-    getRequestConfig()
-  );
+  const result =
+    await axios.get<GoogleAppsScript.YouTube.Schema.PlaylistListResponse>(
+      urlWithQuery,
+      getRequestConfig()
+    );
   const playlists = playlistResultToPlaylist(result.data);
-  return playlists;
+  const playlistResults: SearchPlaylistResult = {
+    items: playlistResultToPlaylist(result.data),
+    pageInfo: {
+      totalResults: result.data.pageInfo.totalResults,
+      resultsPerPage: result.data.pageInfo.resultsPerPage,
+      offset: request.page ? request.page.offset : 0,
+      nextPage: result.data.nextPageToken,
+      prevPage: result.data.prevPageToken,
+    },
+  };
+  return playlistResults;
 }
 
-async function searchTracks(query: string): Promise<ISong[]> {
+async function searchTracks(
+  request: SearchRequest
+): Promise<SearchTrackResult> {
   const url = "https://www.googleapis.com/youtube/v3/search";
-  const urlWithQuery = `${url}?part=id&type=video&maxResults=50&key=${key}&q=${encodeURIComponent(
-    query
+  let urlWithQuery = `${url}?part=id&type=video&maxResults=50&key=${key}&q=${encodeURIComponent(
+    request.query
   )}`;
-  const results = await axios.get<IYoutubeSearchResult>(urlWithQuery);
+  if (request.page) {
+    if (request.page.nextPage) {
+      // Next Page
+      urlWithQuery += `&pageToken=${request.page.nextPage}`;
+    } else if (request.page.prevPage) {
+      // Prev P1ge
+      urlWithQuery += `&pageToken=${request.page.prevPage}`;
+    }
+  }
+
+  const results =
+    await axios.get<GoogleAppsScript.YouTube.Schema.SearchListResponse>(
+      urlWithQuery
+    );
   const detailsUrl = "https://www.googleapis.com/youtube/v3/videos";
   const ids = results.data.items.map((i) => i.id.videoId).join(",");
   const detailsUrlWithQuery = `${detailsUrl}?key=${key}&part=snippet,contentDetails&id=${ids}`;
-  const detailsResults = await axios.get<IYoutubeResult>(detailsUrlWithQuery);
-  return resultToSongYoutube(detailsResults.data);
+  const detailsResults =
+    await axios.get<GoogleAppsScript.YouTube.Schema.VideoListResponse>(
+      detailsUrlWithQuery
+    );
+  const trackResults: SearchTrackResult = {
+    items: resultToSongYoutube(detailsResults.data),
+    pageInfo: {
+      totalResults: results.data.pageInfo.totalResults,
+      resultsPerPage: results.data.pageInfo.resultsPerPage,
+      offset: request.page ? request.page.offset : 0,
+      nextPage: results.data.nextPageToken,
+      prevPage: results.data.prevPageToken,
+    },
+  };
+  return trackResults;
 }
 
-async function getPlaylistTracks(playlist: IPlaylist): Promise<ISong[]> {
+async function searchPlaylists(
+  request: SearchRequest
+): Promise<SearchPlaylistResult> {
+  const url = "https://www.googleapis.com/youtube/v3/search";
+  let urlWithQuery = `${url}?part=snippet&type=playlist&maxResults=50&key=${key}&q=${encodeURIComponent(
+    request.query
+  )}`;
+  if (request.page) {
+    if (request.page.nextPage) {
+      // Next Page
+      urlWithQuery += `&pageToken=${request.page.nextPage}`;
+    } else if (request.page.prevPage) {
+      // Prev P1ge
+      urlWithQuery += `&pageToken=${request.page.prevPage}`;
+    }
+  }
+  const results =
+    await axios.get<GoogleAppsScript.YouTube.Schema.SearchListResponse>(
+      urlWithQuery
+    );
+  const playlistResults: SearchPlaylistResult = {
+    items: playlistSearchResultToPlaylist(results.data),
+    pageInfo: {
+      totalResults: results.data.pageInfo.totalResults,
+      resultsPerPage: results.data.pageInfo.resultsPerPage,
+      offset: request.page ? request.page.offset : 0,
+      nextPage: results.data.nextPageToken,
+      prevPage: results.data.prevPageToken,
+    },
+  };
+  return playlistResults;
+}
+
+async function getPlaylistTracks(
+  request: PlaylistTrackRequest
+): Promise<SearchTrackResult> {
   const url = `https://www.googleapis.com/youtube/v3/playlistItems`;
-  let urlWithQuery = `${url}?part=contentDetails&maxResults=50&key=${key}&playlistId=${playlist.apiId}`;
-  if (playlist.isUserPlaylist) {
+  let urlWithQuery = `${url}?part=contentDetails&maxResults=50&key=${key}&playlistId=${request.playlist.apiId}`;
+  if (request.playlist.isUserPlaylist) {
     urlWithQuery += "&mine=true";
   }
-  const config = playlist.isUserPlaylist ? getRequestConfig() : undefined;
-  const result = await axios.get<IYoutubePlaylistItemResult>(
-    urlWithQuery,
-    config
-  );
+  if (request.page) {
+    if (request.page.nextPage) {
+      // Next Page
+      urlWithQuery += `&pageToken=${request.page.nextPage}`;
+    } else if (request.page.prevPage) {
+      // Prev P1ge
+      urlWithQuery += `&pageToken=${request.page.prevPage}`;
+    }
+  }
+  const config = request.playlist.isUserPlaylist
+    ? getRequestConfig()
+    : undefined;
+  const result =
+    await axios.get<GoogleAppsScript.YouTube.Schema.PlaylistItemListResponse>(
+      urlWithQuery,
+      config
+    );
   const detailsUrl = "https://www.googleapis.com/youtube/v3/videos";
   const ids = result.data.items.map((i) => i.contentDetails.videoId).join(",");
   const detailsUrlWithQuery = `${detailsUrl}?key=${key}&part=snippet,contentDetails&id=${ids}`;
-  const detailsResults = await axios.get<IYoutubeResult>(detailsUrlWithQuery);
-  return resultToSongYoutube(detailsResults.data);
-}
-
-async function searchPlaylists(query: string): Promise<IPlaylist[]> {
-  const url = "https://www.googleapis.com/youtube/v3/search";
-  const urlWithQuery = `${url}?part=snippet&type=playlist&maxResults=50&key=${key}&q=${encodeURIComponent(
-    query
-  )}`;
-  const result = await axios.get<IYoutubeSearchResult>(urlWithQuery);
-  return playlistSearchResultToPlaylist(result.data);
+  const detailsResults =
+    await axios.get<GoogleAppsScript.YouTube.Schema.VideoListResponse>(
+      detailsUrlWithQuery
+    );
+  const trackResults: SearchTrackResult = {
+    items: resultToSongYoutube(detailsResults.data),
+    pageInfo: {
+      totalResults: result.data.pageInfo.totalResults,
+      resultsPerPage: result.data.pageInfo.resultsPerPage,
+      offset: request.page ? request.page.offset : 0,
+      nextPage: result.data.nextPageToken,
+      prevPage: result.data.prevPageToken,
+    },
+  };
+  return trackResults;
 }
 
 async function getYoutubeTrack(song: ISong): Promise<string> {
@@ -235,33 +330,28 @@ async function getYoutubeTrack(song: ISong): Promise<string> {
   return formatInfo.url;
 }
 
-const funcs = {
-  name: "youtube",
-  async getAlbumTracks(_album: IAlbum) {
-    return [];
-  },
-  async getArtistAlbums(_artist: IArtist) {
-    return [];
-  },
-  async getPlaylistTracks(playlist: IPlaylist) {
-    return await getPlaylistTracks(playlist);
-  },
-  async searchAll(query: string) {
-    return {
-      albums: [],
-      artists: [],
-      playlists: await searchPlaylists(query),
-      tracks: await searchTracks(query),
-    };
-  },
-  async getTrackUrl(song: ISong): Promise<string> {
-    return getYoutubeTrack(song);
-  },
-};
+async function searchAll(request: SearchRequest): Promise<SearchAllResult> {
+  const tracksPromise = searchTracks(request);
+  const playlistsPromise = searchPlaylists(request);
+  const [tracks, playlists] = await Promise.all([
+    tracksPromise,
+    playlistsPromise,
+  ]);
+  return {
+    tracks,
+    playlists,
+  };
+}
 
-application.searchAll = funcs.searchAll;
-application.getTrackUrl = funcs.getTrackUrl;
-application.getPlaylistTracks = funcs.getPlaylistTracks;
+async function getTrackUrl(song: ISong): Promise<string> {
+  return getYoutubeTrack(song);
+}
+
+application.searchAll = searchAll;
+application.searchTracks = searchTracks;
+application.searchPlaylists = searchPlaylists;
+application.getTrackUrl = getTrackUrl;
+application.getPlaylistTracks = getPlaylistTracks;
 
 application.onDeepLinkMessage = async (message: string) => {
   application.postUiMessage({ type: "deeplink", url: message });

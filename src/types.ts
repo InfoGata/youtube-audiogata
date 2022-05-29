@@ -46,65 +46,16 @@ export interface IImage {
   width: number;
 }
 
-export interface IYoutubeSearchResult {
-  items: IYoutubeSearchResultItem[];
-}
-
-export interface IPlaylistResult {
-  items: IYoutubePlaylistResult[];
-}
-
-export interface IYoutubePlaylistResult {
-  id: string;
-  snippet: IYoutubeItemSnippet;
-}
-export interface IYoutubeSearchResultItem {
-  id: IYoutubeItemId;
-  snippet: IYoutubeItemSnippet;
-}
-export interface IYoutubeItemId {
-  videoId: string;
-  playlistId: string;
-}
-export interface IYoutubeResult {
-  items: IYoutubeItem[];
-}
-export interface IYoutubeItem {
-  id: string;
-  snippet: IYoutubeItemSnippet;
-  contentDetails: IYoutubeContentDetails;
-}
-export interface IYoutubeItemSnippet {
-  title: string;
-  thumbnails: IYoutubeThumbnails;
-}
-export interface IYoutubeThumbnails {
-  default: IImage;
-  medium: IImage;
-  high: IImage;
-}
-export interface IYoutubeContentDetails {
-  duration: string;
-}
-export interface IYoutubePlaylistItemResult {
-  items: IYoutubePlaylistItemItem[];
-}
-export interface IYoutubePlaylistItemItem {
-  contentDetails: IYoutubePlaylistItemDetails;
-}
-export interface IYoutubePlaylistItemDetails {
-  videoId: string;
-}
-
 export interface Application {
-  searchAll?: (query: string) => Promise<{
-    tracks?: ISong[];
-    albums?: IAlbum[];
-    artists?: IArtist[];
-    playlists?: IPlaylist[];
-  }>;
+  searchAll?: (request: SearchRequest) => Promise<SearchAllResult>;
+  searchTracks?: (request: SearchRequest) => Promise<SearchTrackResult>;
+  searchArtists?: (request: SearchRequest) => Promise<SearchArtistResult>;
+  searchAlbums?: (request: SearchRequest) => Promise<SearchAlbumResult>;
+  searchPlaylists?: (request: SearchRequest) => Promise<SearchPlaylistResult>;
   getTrackUrl?: (song: ISong) => Promise<string>;
-  getPlaylistTracks?: (playlist: IPlaylist) => Promise<ISong[]>;
+  getPlaylistTracks?: (
+    request: PlaylistTrackRequest
+  ) => Promise<SearchTrackResult>;
   postUiMessage: (msg: any) => Promise<void>;
   onDeepLinkMessage: (message: string) => Promise<void>;
   onUiMessage?: (message: any) => void;
@@ -112,5 +63,56 @@ export interface Application {
   isNetworkRequestCorsDisabled: () => Promise<boolean>;
   getCorsProxy: () => Promise<string>;
   getPluginId: () => Promise<string>;
-  getUserPlaylists?: () => Promise<IPlaylist[]>;
+  getUserPlaylists: (
+    request: UserPlaylistRequest
+  ) => Promise<SearchPlaylistResult>;
+}
+
+export interface PageInfo {
+  totalResults: number;
+  resultsPerPage: number;
+  offset: number;
+  nextPage?: string;
+  prevPage?: string;
+}
+
+export interface SearchAllResult {
+  tracks?: SearchTrackResult;
+  albums?: SearchAlbumResult;
+  artists?: SearchArtistResult;
+  playlists?: SearchPlaylistResult;
+}
+
+export interface SearchTrackResult {
+  items: ISong[];
+  pageInfo?: PageInfo;
+}
+
+export interface SearchArtistResult {
+  items: IArtist[];
+  pageInfo?: PageInfo;
+}
+
+export interface SearchAlbumResult {
+  items: IAlbum[];
+  pageInfo?: PageInfo;
+}
+
+export interface SearchPlaylistResult {
+  items: IPlaylist[];
+  pageInfo?: PageInfo;
+}
+
+export interface SearchRequest {
+  query: string;
+  page?: PageInfo;
+}
+
+export interface PlaylistTrackRequest {
+  playlist: IPlaylist;
+  page?: PageInfo;
+}
+
+export interface UserPlaylistRequest {
+  page?: PageInfo;
 }
