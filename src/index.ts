@@ -160,7 +160,6 @@ async function getUserPlaylists(
       urlWithQuery,
       getRequestConfig()
     );
-  const playlists = playlistResultToPlaylist(result.data);
   const playlistResults: SearchPlaylistResult = {
     items: playlistResultToPlaylist(result.data),
     pageInfo: {
