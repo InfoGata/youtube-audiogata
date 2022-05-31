@@ -63,7 +63,7 @@ export interface Application {
   isNetworkRequestCorsDisabled: () => Promise<boolean>;
   getCorsProxy: () => Promise<string>;
   getPluginId: () => Promise<string>;
-  getUserPlaylists: (
+  getUserPlaylists?: (
     request: UserPlaylistRequest
   ) => Promise<SearchPlaylistResult>;
 }

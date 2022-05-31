@@ -17,7 +17,7 @@ declare var application: Application;
 
 const key = "AIzaSyB3nKWm5VUqMMAaFhC3QCH_0VJU84Oyq48";
 let pluginId = "";
-let accessToken = "";
+let accessToken: string | null = "";
 let redirectUri = "";
 
 const getRequestConfig = () => {
@@ -80,7 +80,7 @@ application.onUiMessage = async (message: any) => {
       break;
     case "login":
       accessToken = message.accessToken;
-      localStorage.setItem("access_token", accessToken);
+      localStorage.setItem("access_token", accessToken || "");
       application.getUserPlaylists = getUserPlaylists;
       break;
     case "logout":
@@ -97,14 +97,15 @@ application.onUiMessage = async (message: any) => {
 function playlistResultToPlaylist(
   result: GoogleAppsScript.YouTube.Schema.PlaylistListResponse
 ): IPlaylist[] {
-  return result.items.map((r) => ({
+  const items = result.items || [];
+  return items.map((r) => ({
     apiId: r.id,
-    name: r.snippet.title,
+    name: r.snippet?.title,
     images: [
       {
-        width: r.snippet.thumbnails.default.width,
-        url: r.snippet.thumbnails.default.url,
-        height: r.snippet.thumbnails.default.height,
+        width: r.snippet?.thumbnails?.default?.width || 0,
+        url: r.snippet?.thumbnails?.default?.url || "",
+        height: r.snippet?.thumbnails?.default?.height || 0,
       },
     ],
     isUserPlaylist: true,
@@ -115,15 +116,16 @@ function playlistResultToPlaylist(
 function playlistSearchResultToPlaylist(
   result: GoogleAppsScript.YouTube.Schema.SearchListResponse
 ): IPlaylist[] {
-  return result.items.map((r) => ({
-    apiId: r.id.playlistId,
+  const items = result.items || [];
+  return items.map((r) => ({
+    apiId: r.id?.playlistId,
     from: "youtube",
-    name: r.snippet.title,
+    name: r.snippet?.title,
     images: [
       {
-        width: r.snippet.thumbnails.default.width,
-        url: r.snippet.thumbnails.default.url,
-        height: r.snippet.thumbnails.default.height,
+        width: r.snippet?.thumbnails?.default?.width || 0,
+        url: r.snippet?.thumbnails?.default?.url || "",
+        height: r.snippet?.thumbnails?.default?.height || 0,
       },
     ],
     songs: [],
@@ -133,19 +135,19 @@ function playlistSearchResultToPlaylist(
 function resultToSongYoutube(
   result: GoogleAppsScript.YouTube.Schema.VideoListResponse
 ): ISong[] {
-  const items = result.items;
+  const items = result.items || [];
   return items.map(
     (i) =>
       ({
         apiId: i.id,
-        duration: toSeconds(parse(i.contentDetails.duration)),
+        duration: toSeconds(parse(i.contentDetails?.duration || "0")),
         from: "youtube",
         images: [
-          i.snippet.thumbnails.default,
-          i.snippet.thumbnails.medium,
-          i.snippet.thumbnails.high,
+          i.snippet?.thumbnails?.default,
+          i.snippet?.thumbnails?.medium,
+          i.snippet?.thumbnails?.high,
         ],
-        name: i.snippet.title,
+        name: i.snippet?.title,
       } as ISong)
   );
 }
@@ -163,8 +165,8 @@ async function getUserPlaylists(
   const playlistResults: SearchPlaylistResult = {
     items: playlistResultToPlaylist(result.data),
     pageInfo: {
-      totalResults: result.data.pageInfo.totalResults,
-      resultsPerPage: result.data.pageInfo.resultsPerPage,
+      totalResults: result.data.pageInfo?.totalResults || 0,
+      resultsPerPage: result.data.pageInfo?.resultsPerPage || 0,
       offset: request.page ? request.page.offset : 0,
       nextPage: result.data.nextPageToken,
       prevPage: result.data.prevPageToken,
@@ -195,7 +197,7 @@ async function searchTracks(
       urlWithQuery
     );
   const detailsUrl = "https://www.googleapis.com/youtube/v3/videos";
-  const ids = results.data.items.map((i) => i.id.videoId).join(",");
+  const ids = results.data.items?.map((i) => i.id?.videoId).join(",");
   const detailsUrlWithQuery = `${detailsUrl}?key=${key}&part=snippet,contentDetails&id=${ids}`;
   const detailsResults =
     await axios.get<GoogleAppsScript.YouTube.Schema.VideoListResponse>(
@@ -204,8 +206,8 @@ async function searchTracks(
   const trackResults: SearchTrackResult = {
     items: resultToSongYoutube(detailsResults.data),
     pageInfo: {
-      totalResults: results.data.pageInfo.totalResults,
-      resultsPerPage: results.data.pageInfo.resultsPerPage,
+      totalResults: results.data.pageInfo?.totalResults || 0,
+      resultsPerPage: results.data.pageInfo?.resultsPerPage || 0,
       offset: request.page ? request.page.offset : 0,
       nextPage: results.data.nextPageToken,
       prevPage: results.data.prevPageToken,
@@ -237,8 +239,8 @@ async function searchPlaylists(
   const playlistResults: SearchPlaylistResult = {
     items: playlistSearchResultToPlaylist(results.data),
     pageInfo: {
-      totalResults: results.data.pageInfo.totalResults,
-      resultsPerPage: results.data.pageInfo.resultsPerPage,
+      totalResults: results.data.pageInfo?.totalResults || 0,
+      resultsPerPage: results.data.pageInfo?.resultsPerPage || 0,
       offset: request.page ? request.page.offset : 0,
       nextPage: results.data.nextPageToken,
       prevPage: results.data.prevPageToken,
@@ -273,7 +275,9 @@ async function getPlaylistTracks(
       config
     );
   const detailsUrl = "https://www.googleapis.com/youtube/v3/videos";
-  const ids = result.data.items.map((i) => i.contentDetails.videoId).join(",");
+  const ids = result.data.items
+    ?.map((i) => i.contentDetails?.videoId)
+    .join(",");
   const detailsUrlWithQuery = `${detailsUrl}?key=${key}&part=snippet,contentDetails&id=${ids}`;
   const detailsResults =
     await axios.get<GoogleAppsScript.YouTube.Schema.VideoListResponse>(
@@ -282,8 +286,8 @@ async function getPlaylistTracks(
   const trackResults: SearchTrackResult = {
     items: resultToSongYoutube(detailsResults.data),
     pageInfo: {
-      totalResults: result.data.pageInfo.totalResults,
-      resultsPerPage: result.data.pageInfo.resultsPerPage,
+      totalResults: result.data.pageInfo?.totalResults || 0,
+      resultsPerPage: result.data.pageInfo?.resultsPerPage || 0,
       offset: request.page ? request.page.offset : 0,
       nextPage: result.data.nextPageToken,
       prevPage: result.data.prevPageToken,
@@ -357,7 +361,7 @@ application.onDeepLinkMessage = async (message: string) => {
 };
 
 window.fetch = function () {
-  return application.networkRequest.apply(this, arguments);
+  return application.networkRequest.apply(this, arguments as any);
 };
 
 const init = () => {
