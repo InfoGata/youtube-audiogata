@@ -2,17 +2,7 @@ import axios, { AxiosRequestConfig } from "axios";
 import { parse, toSeconds } from "iso8601-duration";
 import ytdl from "ytdl-core";
 import { getAuthUrl, REDIRECT_PATH } from "./shared";
-import {
-  IPlaylist,
-  ISong,
-  Application,
-  SearchRequest,
-  SearchAllResult,
-  SearchTrackResult,
-  SearchPlaylistResult,
-  PlaylistTrackRequest,
-  UserPlaylistRequest,
-} from "./types";
+import "audiogata-plugin-typings";
 declare var application: Application;
 
 const key = "AIzaSyB3nKWm5VUqMMAaFhC3QCH_0VJU84Oyq48";
@@ -100,7 +90,7 @@ function playlistResultToPlaylist(
   const items = result.items || [];
   return items.map((r) => ({
     apiId: r.id,
-    name: r.snippet?.title,
+    name: r.snippet?.title || "",
     images: [
       {
         width: r.snippet?.thumbnails?.default?.width || 0,
@@ -120,7 +110,7 @@ function playlistSearchResultToPlaylist(
   return items.map((r) => ({
     apiId: r.id?.playlistId,
     from: "youtube",
-    name: r.snippet?.title,
+    name: r.snippet?.title || "",
     images: [
       {
         width: r.snippet?.thumbnails?.default?.width || 0,
