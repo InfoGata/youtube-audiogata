@@ -86,7 +86,7 @@ application.onUiMessage = async (message: any) => {
 
 function playlistResultToPlaylist(
   result: GoogleAppsScript.YouTube.Schema.PlaylistListResponse
-): IPlaylist[] {
+): Playlist[] {
   const items = result.items || [];
   return items.map((r) => ({
     apiId: r.id,
@@ -105,7 +105,7 @@ function playlistResultToPlaylist(
 
 function playlistSearchResultToPlaylist(
   result: GoogleAppsScript.YouTube.Schema.SearchListResponse
-): IPlaylist[] {
+): Playlist[] {
   const items = result.items || [];
   return items.map((r) => ({
     apiId: r.id?.playlistId,
@@ -124,22 +124,22 @@ function playlistSearchResultToPlaylist(
 
 function resultToSongYoutube(
   result: GoogleAppsScript.YouTube.Schema.VideoListResponse
-): ISong[] {
+): Track[] {
   const items = result.items || [];
-  return items.map(
-    (i) =>
-      ({
-        apiId: i.id,
-        duration: toSeconds(parse(i.contentDetails?.duration || "0")),
-        from: "youtube",
-        images: [
-          i.snippet?.thumbnails?.default,
-          i.snippet?.thumbnails?.medium,
-          i.snippet?.thumbnails?.high,
-        ],
-        name: i.snippet?.title,
-      } as ISong)
-  );
+  return items.map((i) => ({
+    apiId: i.id,
+    duration: toSeconds(parse(i.contentDetails?.duration || "0")),
+    from: "youtube",
+    source: "",
+    images: [
+      {
+        width: i.snippet?.thumbnails?.default?.width || 0,
+        url: i.snippet?.thumbnails?.default?.url || "",
+        height: i.snippet?.thumbnails?.default?.height || 0,
+      },
+    ],
+    name: i.snippet?.title || "",
+  }));
 }
 
 async function getUserPlaylists(
@@ -286,7 +286,7 @@ async function getPlaylistTracks(
   return trackResults;
 }
 
-async function getYoutubeTrack(song: ISong): Promise<string> {
+async function getYoutubeTrack(song: Track): Promise<string> {
   const corsDisabled = await application.isNetworkRequestCorsDisabled();
   let info: ytdl.videoInfo;
 
@@ -336,7 +336,7 @@ async function searchAll(request: SearchRequest): Promise<SearchAllResult> {
   };
 }
 
-async function getTrackUrl(song: ISong): Promise<string> {
+async function getTrackUrl(song: Track): Promise<string> {
   return getYoutubeTrack(song);
 }
 
