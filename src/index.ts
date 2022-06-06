@@ -3,7 +3,6 @@ import { parse, toSeconds } from "iso8601-duration";
 import ytdl from "ytdl-core";
 import { getAuthUrl, REDIRECT_PATH } from "./shared";
 import "audiogata-plugin-typings";
-declare var application: Application;
 
 const key = "AIzaSyB3nKWm5VUqMMAaFhC3QCH_0VJU84Oyq48";
 let pluginId = "";
@@ -86,7 +85,7 @@ application.onUiMessage = async (message: any) => {
 
 function playlistResultToPlaylist(
   result: GoogleAppsScript.YouTube.Schema.PlaylistListResponse
-): Playlist[] {
+): PlaylistInfo[] {
   const items = result.items || [];
   return items.map((r) => ({
     apiId: r.id,
@@ -99,13 +98,12 @@ function playlistResultToPlaylist(
       },
     ],
     isUserPlaylist: true,
-    tracks: [],
   }));
 }
 
 function playlistSearchResultToPlaylist(
   result: GoogleAppsScript.YouTube.Schema.SearchListResponse
-): Playlist[] {
+): PlaylistInfo[] {
   const items = result.items || [];
   return items.map((r) => ({
     apiId: r.id?.playlistId,
@@ -117,7 +115,6 @@ function playlistSearchResultToPlaylist(
         height: r.snippet?.thumbnails?.default?.height || 0,
       },
     ],
-    tracks: [],
   }));
 }
 
