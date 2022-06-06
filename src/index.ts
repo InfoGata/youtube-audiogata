@@ -99,7 +99,7 @@ function playlistResultToPlaylist(
       },
     ],
     isUserPlaylist: true,
-    songs: [],
+    tracks: [],
   }));
 }
 
@@ -109,7 +109,6 @@ function playlistSearchResultToPlaylist(
   const items = result.items || [];
   return items.map((r) => ({
     apiId: r.id?.playlistId,
-    from: "youtube",
     name: r.snippet?.title || "",
     images: [
       {
@@ -118,7 +117,7 @@ function playlistSearchResultToPlaylist(
         height: r.snippet?.thumbnails?.default?.height || 0,
       },
     ],
-    songs: [],
+    tracks: [],
   }));
 }
 
