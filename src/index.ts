@@ -125,8 +125,6 @@ function resultToSongYoutube(
   return items.map((i) => ({
     apiId: i.id,
     duration: toSeconds(parse(i.contentDetails?.duration || "0")),
-    from: "youtube",
-    source: "",
     images: [
       {
         width: i.snippet?.thumbnails?.default?.width || 0,
