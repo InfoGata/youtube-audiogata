@@ -70,12 +70,12 @@ application.onUiMessage = async (message: any) => {
     case "login":
       accessToken = message.accessToken;
       localStorage.setItem("access_token", accessToken || "");
-      application.getUserPlaylists = getUserPlaylists;
+      application.onGetUserPlaylists = getUserPlaylists;
       break;
     case "logout":
       localStorage.removeItem("access_token");
       accessToken = null;
-      application.getUserPlaylists = undefined;
+      application.onGetUserPlaylists = undefined;
       break;
     case "silent-renew":
       silentRefresh();
@@ -334,11 +334,11 @@ async function getTrackUrl(song: Track): Promise<string> {
   return getYoutubeTrack(song);
 }
 
-application.searchAll = searchAll;
-application.searchTracks = searchTracks;
-application.searchPlaylists = searchPlaylists;
-application.getTrackUrl = getTrackUrl;
-application.getPlaylistTracks = getPlaylistTracks;
+application.onSearchAll = searchAll;
+application.onSearchTracks = searchTracks;
+application.onSearchPlaylists = searchPlaylists;
+application.onGetTrackUrl = getTrackUrl;
+application.onGetPlaylistTracks = getPlaylistTracks;
 
 application.onDeepLinkMessage = async (message: string) => {
   application.postUiMessage({ type: "deeplink", url: message });
@@ -351,7 +351,7 @@ window.fetch = function () {
 const init = () => {
   accessToken = localStorage.getItem("access_token");
   if (accessToken) {
-    application.getUserPlaylists = getUserPlaylists;
+    application.onGetUserPlaylists = getUserPlaylists;
   }
 };
 
