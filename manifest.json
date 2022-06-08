@@ -3,5 +3,5 @@
   "version": "1.0.0",
   "script": "dist/index.js",
   "options": "dist/options.html",
-  "description": "Plugin for playiing music from youtube.com"
+  "description": "Plugin for playing music from youtube.com"
 }
