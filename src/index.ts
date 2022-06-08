@@ -125,13 +125,15 @@ function resultToSongYoutube(
   return items.map((i) => ({
     apiId: i.id,
     duration: toSeconds(parse(i.contentDetails?.duration || "0")),
-    images: [
-      {
-        width: i.snippet?.thumbnails?.default?.width || 0,
-        url: i.snippet?.thumbnails?.default?.url || "",
-        height: i.snippet?.thumbnails?.default?.height || 0,
-      },
-    ],
+    images:
+      i.snippet?.thumbnails &&
+      Object.values(i.snippet?.thumbnails).map(
+        (v: GoogleAppsScript.YouTube.Schema.Thumbnail) => ({
+          url: v.url || "",
+          height: v.height || 0,
+          width: v.width || 0,
+        })
+      ),
     name: i.snippet?.title || "",
   }));
 }
@@ -330,6 +332,21 @@ async function searchAll(request: SearchRequest): Promise<SearchAllResult> {
   };
 }
 
+async function getTopItems(): Promise<SearchAllResult> {
+  const url = "https://www.googleapis.com/youtube/v3/videos";
+  const urlWithQuery = `${url}?key=${key}&videoCategoryId=10&chart=mostPopular&part=snippet,contentDetails`;
+  const detailsResults =
+    await axios.get<GoogleAppsScript.YouTube.Schema.VideoListResponse>(
+      urlWithQuery
+    );
+  const trackResults: SearchTrackResult = {
+    items: resultToSongYoutube(detailsResults.data),
+  };
+  return {
+    tracks: trackResults,
+  };
+}
+
 async function getTrackUrl(song: Track): Promise<string> {
   return getYoutubeTrack(song);
 }
@@ -339,6 +356,7 @@ application.onSearchTracks = searchTracks;
 application.onSearchPlaylists = searchPlaylists;
 application.onGetTrackUrl = getTrackUrl;
 application.onGetPlaylistTracks = getPlaylistTracks;
+application.onGetTopItems = getTopItems;
 
 application.onDeepLinkMessage = async (message: string) => {
   application.postUiMessage({ type: "deeplink", url: message });
