@@ -1,3 +1,4 @@
+import { Button } from "@mui/material";
 import { FunctionComponent } from "preact";
 import { useState, useEffect } from "preact/hooks";
 import { getAuthUrl, REDIRECT_PATH } from "./shared";
@@ -67,12 +68,18 @@ const App: FunctionComponent = () => {
     <>
       {accessToken ? (
         <div>
-          <button onClick={onLogout}>Logout</button>
-          <button onClick={onSilentRenew}>Silent Renew</button>
+          <Button variant="contained" onClick={onLogout}>
+            Logout
+          </Button>
+          <Button variant="contained" onClick={onSilentRenew}>
+            Silent Renew
+          </Button>
         </div>
       ) : (
         <div>
-          <button onClick={onLogin}>Login</button>
+          <Button variant="contained" onClick={onLogin}>
+            Login
+          </Button>
         </div>
       )}
     </>
