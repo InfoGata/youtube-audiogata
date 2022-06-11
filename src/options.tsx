@@ -1,6 +1,5 @@
 import { createTheme, ThemeProvider } from "@mui/material";
 import { render } from "preact";
-
 import App from "./App";
 
 const theme = createTheme({
