@@ -1,47 +1,58 @@
-import axios, { AxiosRequestConfig } from "axios";
+import axios from "axios";
 import { parse, toSeconds } from "iso8601-duration";
 import ytdl from "ytdl-core";
-import { getAuthUrl, REDIRECT_PATH } from "./shared";
+import { CLIENT_ID, TOKEN_SERVER } from "./shared";
 import "audiogata-plugin-typings";
 
+const http = axios.create();
+
 const key = "AIzaSyB3nKWm5VUqMMAaFhC3QCH_0VJU84Oyq48";
-let pluginId = "";
-let accessToken: string | null = "";
-let redirectUri = "";
+const refreshToken = async () => {
+  const refreshToken = localStorage.getItem("refresh_token");
+  if (!refreshToken) return;
 
-const getRequestConfig = () => {
-  const config: AxiosRequestConfig = {
+  const params = new URLSearchParams();
+  params.append("client_id", CLIENT_ID);
+  params.append("refresh_token", refreshToken);
+  params.append("grant_type", "refresh_token");
+  const result = await axios.post(TOKEN_SERVER, params, {
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/x-www-form-urlencoded",
     },
-  };
-  return config;
+  });
+  if (result.data.access_token && result.data.refresh_token) {
+    localStorage.setItem("auth", JSON.stringify(result.data));
+    return result.data.access_token as string;
+  }
 };
 
-const silentRefresh = () => {
-  const url = getAuthUrl(redirectUri, pluginId);
-  url.searchParams.append("prompt", "none");
-
-  const iframe = document.createElement("iframe");
-  iframe.title = "silent-renew";
-  iframe.src = url.href;
-  const refreshMessanger = (event: MessageEvent) => {
-    if (event.source === iframe.contentWindow) {
-      if (event.data.url) {
-        const tokenUrl = new URL(event.data.url);
-        tokenUrl.search = tokenUrl.hash.substring(1);
-        accessToken = tokenUrl.searchParams.get("access_token");
-        if (accessToken) {
-          localStorage.setItem("access_token", accessToken);
-        }
-      }
-      window.removeEventListener("message", refreshMessanger);
-      iframe.remove();
+http.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      config.headers["Authorization"] = "Bearer " + token;
     }
-  };
-  window.addEventListener("message", refreshMessanger);
-  document.body.append(iframe);
-};
+    return config;
+  },
+  (error) => {
+    Promise.reject(error);
+  }
+);
+
+http.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      const accessToken = await refreshToken();
+      axios.defaults.headers.common["Authorization"] = "Bearer " + accessToken;
+      return http(originalRequest);
+    }
+  }
+);
 
 const sendOrigin = async () => {
   const host = document.location.host;
@@ -49,8 +60,7 @@ const sendOrigin = async () => {
   hostArray.shift();
   const domain = hostArray.join(".");
   const origin = `${document.location.protocol}//${domain}`;
-  redirectUri = `${origin}${REDIRECT_PATH}`;
-  pluginId = await application.getPluginId();
+  const pluginId = await application.getPluginId();
   application.postUiMessage({
     type: "origin",
     origin: origin,
@@ -61,24 +71,21 @@ const sendOrigin = async () => {
 application.onUiMessage = async (message: any) => {
   switch (message.type) {
     case "check-login":
-      accessToken = localStorage.getItem("access_token");
+      const accessToken = localStorage.getItem("access_token");
       if (accessToken) {
         application.postUiMessage({ type: "login", accessToken: accessToken });
       }
       await sendOrigin();
       break;
     case "login":
-      accessToken = message.accessToken;
-      localStorage.setItem("access_token", accessToken || "");
+      localStorage.setItem("access_token", message.accessToken || "");
+      localStorage.setItem("refresh_token", message.refreshToken || "");
       application.onGetUserPlaylists = getUserPlaylists;
       break;
     case "logout":
       localStorage.removeItem("access_token");
-      accessToken = null;
+      localStorage.removeItem("refresh_token");
       application.onGetUserPlaylists = undefined;
-      break;
-    case "silent-renew":
-      silentRefresh();
       break;
   }
 };
@@ -144,9 +151,8 @@ async function getUserPlaylists(
   const url = "https://www.googleapis.com/youtube/v3/playlists";
   const urlWithQuery = `${url}?part=snippet,contentDetails&mine=true&key=${key}`;
   const result =
-    await axios.get<GoogleAppsScript.YouTube.Schema.PlaylistListResponse>(
-      urlWithQuery,
-      getRequestConfig()
+    await http.get<GoogleAppsScript.YouTube.Schema.PlaylistListResponse>(
+      urlWithQuery
     );
   const playlistResults: SearchPlaylistResult = {
     items: playlistResultToPlaylist(result.data),
@@ -252,13 +258,10 @@ async function getPlaylistTracks(
       urlWithQuery += `&pageToken=${request.page.prevPage}`;
     }
   }
-  const config = request.playlist.isUserPlaylist
-    ? getRequestConfig()
-    : undefined;
+  const instance = request.playlist.isUserPlaylist ? http : axios;
   const result =
-    await axios.get<GoogleAppsScript.YouTube.Schema.PlaylistItemListResponse>(
-      urlWithQuery,
-      config
+    await instance.get<GoogleAppsScript.YouTube.Schema.PlaylistItemListResponse>(
+      urlWithQuery
     );
   const detailsUrl = "https://www.googleapis.com/youtube/v3/videos";
   const ids = result.data.items
@@ -367,7 +370,7 @@ window.fetch = function () {
 };
 
 const init = () => {
-  accessToken = localStorage.getItem("access_token");
+  const accessToken = localStorage.getItem("access_token");
   if (accessToken) {
     application.onGetUserPlaylists = getUserPlaylists;
   }

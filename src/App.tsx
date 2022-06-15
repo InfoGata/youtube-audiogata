@@ -1,7 +1,7 @@
 import { Button } from "@mui/material";
 import { FunctionComponent } from "preact";
 import { useState, useEffect } from "preact/hooks";
-import { getAuthUrl, REDIRECT_PATH } from "./shared";
+import { getAuthUrl, getToken, REDIRECT_PATH } from "./shared";
 
 const App: FunctionComponent = () => {
   const [accessToken, setAccessToken] = useState("");
@@ -30,14 +30,20 @@ const App: FunctionComponent = () => {
     const url = getAuthUrl(redirectUri, pluginId);
     const newWindow = window.open(url);
 
-    const onMessage = (returnUrl: string) => {
+    const onMessage = async (returnUrl: string) => {
       const url = new URL(returnUrl);
-      // params are in hash
-      url.search = url.hash.substring(1);
-      const accessToken = url.searchParams.get("access_token");
-      if (accessToken) {
-        parent.postMessage({ type: "login", accessToken: accessToken }, "*");
-        setAccessToken(accessToken);
+      const code = url.searchParams.get("code");
+      if (code) {
+        const response = await getToken(code, redirectUri);
+        parent.postMessage(
+          {
+            type: "login",
+            accessToken: response.access_token,
+            refreshToken: response.refresh_token,
+          },
+          "*"
+        );
+        setAccessToken(response.access_token);
       }
       if (newWindow) {
         newWindow.close();
@@ -60,19 +66,12 @@ const App: FunctionComponent = () => {
     parent.postMessage({ type: "logout" }, "*");
   };
 
-  const onSilentRenew = () => {
-    parent.postMessage({ type: "silent-renew" }, "*");
-  };
-
   return (
     <>
       {accessToken ? (
         <div>
           <Button variant="contained" onClick={onLogout}>
             Logout
-          </Button>
-          <Button variant="contained" onClick={onSilentRenew}>
-            Silent Renew
           </Button>
         </div>
       ) : (
