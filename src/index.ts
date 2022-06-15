@@ -7,6 +7,12 @@ import "audiogata-plugin-typings";
 const http = axios.create();
 
 const key = "AIzaSyB3nKWm5VUqMMAaFhC3QCH_0VJU84Oyq48";
+
+const setTokens = (accessToken: string, refreshToken: string) => {
+  localStorage.setItem("access_token", accessToken);
+  localStorage.setItem("refresh_token", refreshToken);
+};
+
 const refreshToken = async () => {
   const refreshToken = localStorage.getItem("refresh_token");
   if (!refreshToken) return;
@@ -21,7 +27,7 @@ const refreshToken = async () => {
     },
   });
   if (result.data.access_token && result.data.refresh_token) {
-    localStorage.setItem("auth", JSON.stringify(result.data));
+    setTokens(result.data.access_token, result.data.refresh_token);
     return result.data.access_token as string;
   }
 };
@@ -78,8 +84,7 @@ application.onUiMessage = async (message: any) => {
       await sendOrigin();
       break;
     case "login":
-      localStorage.setItem("access_token", message.accessToken || "");
-      localStorage.setItem("refresh_token", message.refreshToken || "");
+      setTokens(message.accessAccessToken, message.refreshToken);
       application.onGetUserPlaylists = getUserPlaylists;
       break;
     case "logout":
