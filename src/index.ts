@@ -8,9 +8,11 @@ const http = axios.create();
 
 const key = "AIzaSyB3nKWm5VUqMMAaFhC3QCH_0VJU84Oyq48";
 
-const setTokens = (accessToken: string, refreshToken: string) => {
+const setTokens = (accessToken: string, refreshToken?: string) => {
   localStorage.setItem("access_token", accessToken);
-  localStorage.setItem("refresh_token", refreshToken);
+  if (refreshToken) {
+    localStorage.setItem("refresh_token", refreshToken);
+  }
 };
 
 const refreshToken = async () => {
@@ -26,8 +28,8 @@ const refreshToken = async () => {
       "Content-Type": "application/x-www-form-urlencoded",
     },
   });
-  if (result.data.access_token && result.data.refresh_token) {
-    setTokens(result.data.access_token, result.data.refresh_token);
+  if (result.data.access_token) {
+    setTokens(result.data.access_token);
     return result.data.access_token as string;
   }
 };
