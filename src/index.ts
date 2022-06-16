@@ -84,7 +84,7 @@ application.onUiMessage = async (message: any) => {
       await sendOrigin();
       break;
     case "login":
-      setTokens(message.accessAccessToken, message.refreshToken);
+      setTokens(message.accessToken, message.refreshToken);
       application.onGetUserPlaylists = getUserPlaylists;
       break;
     case "logout":

@@ -2,7 +2,7 @@ import axios from "axios";
 export const CLIENT_ID =
   "125446267595-noltpkn42520oq1sh4h6cnn41f135n1s.apps.googleusercontent.com";
 export const TOKEN_SERVER =
-  "https://audiogata-oauth.audio-pwa.workers.dev/token";
+  "https://cloudflare-worker-token-service.audio-pwa.workers.dev/token";
 const AUTH_SCOPE = "https://www.googleapis.com/auth/youtube.readonly";
 const AUTH_URL = "https://accounts.google.com/o/oauth2/auth";
 export const REDIRECT_PATH = "/login_popup.html";

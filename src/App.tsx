@@ -35,15 +35,18 @@ const App: FunctionComponent = () => {
       const code = url.searchParams.get("code");
       if (code) {
         const response = await getToken(code, redirectUri);
-        parent.postMessage(
-          {
-            type: "login",
-            accessToken: response.access_token,
-            refreshToken: response.refresh_token,
-          },
-          "*"
-        );
-        setAccessToken(response.access_token);
+        console.log(response);
+        if (response.access_token) {
+          parent.postMessage(
+            {
+              type: "login",
+              accessToken: response.access_token,
+              refreshToken: response.refresh_token,
+            },
+            "*"
+          );
+          setAccessToken(response.access_token);
+        }
       }
       if (newWindow) {
         newWindow.close();
