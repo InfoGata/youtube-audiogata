@@ -1,6 +1,5 @@
 import axios from "axios";
 import { parse, toSeconds } from "iso8601-duration";
-import ytdl from "ytdl-core";
 import { CLIENT_ID, TOKEN_SERVER } from "./shared";
 import "audiogata-plugin-typings";
 
@@ -292,41 +291,24 @@ async function getPlaylistTracks(
   return trackResults;
 }
 
+interface PipedApiResponse {
+  audioStreams: PipedApiAudioStream[];
+}
+
+interface PipedApiAudioStream {
+  format: string;
+  url: string;
+  bitrate: number;
+}
+
 async function getYoutubeTrack(song: Track): Promise<string> {
-  const corsDisabled = await application.isNetworkRequestCorsDisabled();
-  let info: ytdl.videoInfo;
-
-  if (corsDisabled) {
-    info = await ytdl.getInfo(song.apiId || "");
-  } else {
-    const proxy = await application.getCorsProxy();
-    if (proxy) {
-      const url = new URL(proxy);
-      info = await ytdl.getInfo(song.apiId || "", {
-        requestOptions: {
-          transform: (parsed: any) => {
-            parsed.protocol = url.protocol;
-            return {
-              headers: { Host: parsed.host },
-              host: url.hostname,
-              path: `${url.pathname}${url.search}http://youtube.com${parsed.path}`,
-              maxRedirects: 10,
-              port: url.port,
-              protocol: url.protocol,
-            };
-          },
-        },
-      });
-    } else {
-      // Try anyway
-      info = await ytdl.getInfo(song.apiId || "");
-    }
-  }
-
-  const formatInfo = ytdl.chooseFormat(info.formats, {
-    quality: "highestaudio",
-  });
-  return formatInfo.url;
+  const url = `https://pipedapi.kavin.rocks/streams/${song.apiId}`;
+  const response = await axios.get<PipedApiResponse>(url);
+  const sortedArray = response.data.audioStreams.sort(
+    (a, b) => b.bitrate - a.bitrate
+  );
+  const youtubeUrl = sortedArray[0].url;
+  return youtubeUrl;
 }
 
 async function searchAll(request: SearchRequest): Promise<SearchAllResult> {
