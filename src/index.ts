@@ -309,7 +309,7 @@ async function getYoutubeTrack(song: Track): Promise<string> {
             return {
               headers: { Host: parsed.host },
               host: url.hostname,
-              path: "/http://youtube.com" + parsed.path,
+              path: `${url.pathname}${url.search}http://youtube.com${parsed.path}`,
               maxRedirects: 10,
               port: url.port,
               protocol: url.protocol,
