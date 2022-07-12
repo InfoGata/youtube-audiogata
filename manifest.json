@@ -1,4 +1,5 @@
 {
+  "id": "5WWSzBORLfZgym533u87I",
   "name": "Plugin for Youtube",
   "version": "1.0.0",
   "script": "dist/index.js",
