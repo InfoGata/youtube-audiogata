@@ -302,7 +302,10 @@ interface PipedApiAudioStream {
 }
 
 async function getYoutubeTrack(song: Track): Promise<string> {
-  const url = `https://pipedapi.kavin.rocks/streams/${song.apiId}`;
+  // Will sometimes return 304 with expired url
+  // So get a new url each time
+  const timestamp = new Date().getTime();
+  const url = `https://pipedapi.kavin.rocks/streams/${song.apiId}?timestamp=${timestamp}`;
   const response = await axios.get<PipedApiResponse>(url);
   const sortedArray = response.data.audioStreams.sort(
     (a, b) => b.bitrate - a.bitrate
