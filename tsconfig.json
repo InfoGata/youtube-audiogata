@@ -13,7 +13,12 @@
       "es7",
       "es2017",
       "dom"
-    ]
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "react": ["node_modules/preact/compat"],
+      "react-dom": ["node_modules/preact/compat"]
+    },
   },
   "include": [
     "src/**/*"
