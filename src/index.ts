@@ -290,9 +290,9 @@ async function getPlaylistTracks(
 ): Promise<SearchTrackResult> {
   const url = `https://www.googleapis.com/youtube/v3/playlistItems`;
   let urlWithQuery = `${url}?part=contentDetails&maxResults=50&key=${getApiKey()}&playlistId=${
-    request.playlist.apiId
+    request.apiId
   }`;
-  if (request.playlist.isUserPlaylist) {
+  if (request.isUserPlaylist) {
     urlWithQuery += "&mine=true";
   }
   if (request.page) {
@@ -304,7 +304,7 @@ async function getPlaylistTracks(
       urlWithQuery += `&pageToken=${request.page.prevPage}`;
     }
   }
-  const instance = request.playlist.isUserPlaylist ? http : axios;
+  const instance = request.isUserPlaylist ? http : axios;
   const result =
     await instance.get<GoogleAppsScript.YouTube.Schema.PlaylistItemListResponse>(
       urlWithQuery
