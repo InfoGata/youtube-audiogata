@@ -341,7 +341,7 @@ interface PipedApiAudioStream {
   bitrate: number;
 }
 
-async function getYoutubeTrack(song: Track): Promise<string> {
+async function getYoutubeTrack(song: GetTrackUrlRequest): Promise<string> {
   // Will sometimes return 304 with expired url
   // So get a new url each time
   const timestamp = new Date().getTime();
@@ -382,7 +382,7 @@ async function getTopItems(): Promise<SearchAllResult> {
   };
 }
 
-async function getTrackUrl(song: Track): Promise<string> {
+async function getTrackUrl(song: GetTrackUrlRequest): Promise<string> {
   return getYoutubeTrack(song);
 }
 
