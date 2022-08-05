@@ -287,7 +287,7 @@ async function searchPlaylists(
 
 async function getPlaylistTracks(
   request: PlaylistTrackRequest
-): Promise<SearchTrackResult> {
+): Promise<PlaylistTracksResult> {
   const url = `https://www.googleapis.com/youtube/v3/playlistItems`;
   let urlWithQuery = `${url}?part=contentDetails&maxResults=50&key=${getApiKey()}&playlistId=${
     request.apiId
@@ -318,7 +318,7 @@ async function getPlaylistTracks(
     await axios.get<GoogleAppsScript.YouTube.Schema.VideoListResponse>(
       detailsUrlWithQuery
     );
-  const trackResults: SearchTrackResult = {
+  const trackResults: PlaylistTracksResult = {
     items: resultToSongYoutube(detailsResults.data),
     pageInfo: {
       totalResults: result.data.pageInfo?.totalResults || 0,
