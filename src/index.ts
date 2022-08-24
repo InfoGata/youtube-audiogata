@@ -8,7 +8,8 @@ import {
   UiMessageType,
 } from "./shared";
 import "audiogata-plugin-typings";
-
+//import { getYoutubeTrackPiped } from "./piped";
+import { getYoutubeTrackInvidious } from "./invidious";
 const http = axios.create();
 
 const key = "AIzaSyB3nKWm5VUqMMAaFhC3QCH_0VJU84Oyq48";
@@ -169,7 +170,7 @@ function playlistSearchResultToPlaylist(
   }));
 }
 
-function resultToSongYoutube(
+function resultToTrackYoutube(
   result: GoogleAppsScript.YouTube.Schema.VideoListResponse
 ): Track[] {
   const items = result.items || [];
@@ -240,7 +241,7 @@ async function searchTracks(
       detailsUrlWithQuery
     );
   const trackResults: SearchTrackResult = {
-    items: resultToSongYoutube(detailsResults.data),
+    items: resultToTrackYoutube(detailsResults.data),
     pageInfo: {
       totalResults: results.data.pageInfo?.totalResults || 0,
       resultsPerPage: results.data.pageInfo?.resultsPerPage || 0,
@@ -319,7 +320,7 @@ async function getPlaylistTracks(
       detailsUrlWithQuery
     );
   const trackResults: PlaylistTracksResult = {
-    items: resultToSongYoutube(detailsResults.data),
+    items: resultToTrackYoutube(detailsResults.data),
     pageInfo: {
       totalResults: result.data.pageInfo?.totalResults || 0,
       resultsPerPage: result.data.pageInfo?.resultsPerPage || 0,
@@ -331,27 +332,8 @@ async function getPlaylistTracks(
   return trackResults;
 }
 
-interface PipedApiResponse {
-  audioStreams: PipedApiAudioStream[];
-}
-
-interface PipedApiAudioStream {
-  format: string;
-  url: string;
-  bitrate: number;
-}
-
-async function getYoutubeTrack(song: GetTrackUrlRequest): Promise<string> {
-  // Will sometimes return 304 with expired url
-  // So get a new url each time
-  const timestamp = new Date().getTime();
-  const url = `https://pipedapi.kavin.rocks/streams/${song.apiId}?timestamp=${timestamp}`;
-  const response = await axios.get<PipedApiResponse>(url);
-  const sortedArray = response.data.audioStreams.sort(
-    (a, b) => b.bitrate - a.bitrate
-  );
-  const youtubeUrl = sortedArray[0].url;
-  return youtubeUrl;
+async function getYoutubeTrack(track: GetTrackUrlRequest): Promise<string> {
+  return getYoutubeTrackInvidious(track);
 }
 
 async function searchAll(request: SearchRequest): Promise<SearchAllResult> {
@@ -375,15 +357,15 @@ async function getTopItems(): Promise<SearchAllResult> {
       urlWithQuery
     );
   const trackResults: SearchTrackResult = {
-    items: resultToSongYoutube(detailsResults.data),
+    items: resultToTrackYoutube(detailsResults.data),
   };
   return {
     tracks: trackResults,
   };
 }
 
-async function getTrackUrl(song: GetTrackUrlRequest): Promise<string> {
-  return getYoutubeTrack(song);
+async function getTrackUrl(track: GetTrackUrlRequest): Promise<string> {
+  return getYoutubeTrack(track);
 }
 
 application.onSearchAll = searchAll;
