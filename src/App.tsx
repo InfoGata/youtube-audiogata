@@ -37,6 +37,7 @@ const App: FunctionComponent = () => {
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [instance, setInstance] = useState("");
 
   useEffect(() => {
     const onNewWindowMessage = (event: MessageEvent<MessageType>) => {
@@ -52,10 +53,14 @@ const App: FunctionComponent = () => {
           setApiKey(event.data.clientId);
           setClientId(event.data.clientId);
           setClientSecret(event.data.clientSecret);
+          setInstance(event.data.instance);
           if (event.data.clientId) {
             setShowAdvanced(true);
             setUseOwnKeys(true);
           }
+          break;
+        case "sendinstance":
+          setInstance(event.data.instance);
           break;
       }
     };
@@ -65,9 +70,7 @@ const App: FunctionComponent = () => {
   }, []);
 
   const onLogin = () => {
-    const url = useOwnKeys
-      ? getAuthUrl(redirectUri, pluginId, clientId)
-      : getAuthUrl(redirectUri, pluginId);
+    const url = getAuthUrl(redirectUri, pluginId, clientId);
     const newWindow = window.open(url);
 
     const onMessage = async (returnUrl: string) => {
@@ -140,93 +143,104 @@ const App: FunctionComponent = () => {
     event.preventDefault();
   };
 
+  const getInstance = () => {
+    sendUiMessage({ type: "getinstnace" });
+  };
+
   return (
-    <Box
-      sx={{ display: "flex", "& .MuiTextField-root": { m: 1, width: "25ch" } }}
-    >
+    <Box sx={{ display: "flex" }}>
       <CssBaseline />
-      {accessToken ? (
-        <div>
-          <Button variant="contained" onClick={onLogout}>
-            Logout
-          </Button>
-        </div>
-      ) : (
-        <div>
-          <Button variant="contained" onClick={onLogin}>
-            Login
-          </Button>
-          {useOwnKeys && (
-            <Typography>
-              Using keys set in the Advanced Configuration
-            </Typography>
-          )}
-          <Accordion expanded={showAdvanced} onChange={onAccordionChange}>
-            <AccordionSummary
-              expandIcon={<ExpandMoreIcon />}
-              aria-controls="panel1d-content"
-              id="panel1d-header"
-            >
-              <Typography>Advanced Configuration</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Typography>Supplying your own keys:</Typography>
-              <Typography>
-                {redirectUri} needs be added to Authorized Javascript URIs
-              </Typography>
-              <div>
-                <TextField
-                  label="Api Key"
-                  value={apiKey}
-                  onChange={(e) => {
-                    const value = e.currentTarget.value;
-                    setApiKey(value);
-                  }}
-                />
-                <TextField
-                  label="Client ID"
-                  value={clientId}
-                  onChange={(e) => {
-                    const value = e.currentTarget.value;
-                    setClientId(value);
-                  }}
-                />
-                <TextField
-                  type={showPassword ? "text" : "password"}
-                  label="Client Secret"
-                  value={clientSecret}
-                  onChange={(e) => {
-                    const value = e.currentTarget.value;
-                    setClientSecret(value);
-                  }}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          aria-label="toggle password visibility"
-                          onClick={handleClickShowPassword}
-                          onMouseDown={handleMouseDownPassword}
-                          edge="end"
-                        >
-                          {showPassword ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              </div>
-              <Stack spacing={2} direction="row">
-                <Button variant="contained" onClick={onSaveKeys}>
-                  Save
+      <Stack spacing={2}>
+        {accessToken ? (
+          <div>
+            <Button variant="contained" onClick={onLogout}>
+              Logout
+            </Button>
+          </div>
+        ) : (
+          <div>
+            <Accordion expanded={showAdvanced} onChange={onAccordionChange}>
+              <AccordionSummary
+                expandIcon={<ExpandMoreIcon />}
+                aria-controls="panel1d-content"
+                id="panel1d-header"
+              >
+                <Typography>Advanced Configuration</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Button
+                  variant="contained"
+                  onClick={onLogin}
+                  disabled={!useOwnKeys}
+                >
+                  Login
                 </Button>
-                <Button variant="contained" onClick={onClearKeys} color="error">
-                  Clear
-                </Button>
-              </Stack>
-            </AccordionDetails>
-          </Accordion>
-        </div>
-      )}
+                <Typography>Supplying your own keys:</Typography>
+                <Typography>
+                  {redirectUri} needs be added to Authorized Javascript URIs
+                </Typography>
+                <div>
+                  <TextField
+                    label="Api Key"
+                    value={apiKey}
+                    onChange={(e) => {
+                      const value = e.currentTarget.value;
+                      setApiKey(value);
+                    }}
+                  />
+                  <TextField
+                    label="Client ID"
+                    value={clientId}
+                    onChange={(e) => {
+                      const value = e.currentTarget.value;
+                      setClientId(value);
+                    }}
+                  />
+                  <TextField
+                    type={showPassword ? "text" : "password"}
+                    label="Client Secret"
+                    value={clientSecret}
+                    onChange={(e) => {
+                      const value = e.currentTarget.value;
+                      setClientSecret(value);
+                    }}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            aria-label="toggle password visibility"
+                            onClick={handleClickShowPassword}
+                            onMouseDown={handleMouseDownPassword}
+                            edge="end"
+                          >
+                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </div>
+                <Stack spacing={2} direction="row">
+                  <Button variant="contained" onClick={onSaveKeys}>
+                    Save
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={onClearKeys}
+                    color="error"
+                  >
+                    Clear
+                  </Button>
+                </Stack>
+              </AccordionDetails>
+            </Accordion>
+          </div>
+        )}
+        <Box sx={{ width: "100%" }}>
+          <TextField value={instance} fullWidth disabled />
+        </Box>
+        <Button onClick={getInstance}>Get Different Instance</Button>
+      </Stack>
     </Box>
   );
 };

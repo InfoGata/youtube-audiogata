@@ -25,12 +25,16 @@ type UiSetKeysType = {
   clientId: string;
   clientSecret: string;
 };
+type UiGetInstanceType = {
+  type: "getinstnace";
+};
 
 export type UiMessageType =
   | UiCheckLoginType
   | UiLoginType
   | UiLogoutType
-  | UiSetKeysType;
+  | UiSetKeysType
+  | UiGetInstanceType;
 
 type LoginType = {
   type: "login";
@@ -44,9 +48,20 @@ type InfoType = {
   apiKey: string;
   clientId: string;
   clientSecret: string;
+  instance: string;
 };
 
-export type MessageType = LoginType | InfoType;
+type SendInstance = {
+  type: "sendinstance";
+  instance: string;
+};
+
+export type MessageType = LoginType | InfoType | SendInstance;
+
+export const enum StorageType {
+  Instances = "instances",
+  CurrentInstance = "current-instance",
+}
 
 export interface TokenResponse {
   access_token: string;
