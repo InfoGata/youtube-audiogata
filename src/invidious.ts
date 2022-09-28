@@ -142,11 +142,29 @@ export const searchTracksInvidious = async (
 ): Promise<SearchTrackResult> => {
   const instance = await getCurrentInstance();
   let url = `${instance}/api/v1/search?q=${request.query}&type=video`;
+  let page: PageInfo = {
+    resultsPerPage: 20,
+    offset: request.page?.offset || 0,
+  };
+  if (request.page?.nextPage) {
+    url += `&page=${request.page.nextPage}`;
+    const currentPage = parseInt(request.page.nextPage);
+    page.prevPage = (currentPage - 1).toString();
+    page.nextPage = (currentPage + 1).toString();
+  } else if (request.page?.prevPage) {
+    url += `&page=${request.page.prevPage}`;
+    const currentPage = parseInt(request.page.prevPage);
+    page.prevPage = (currentPage - 1).toString();
+    page.nextPage = (currentPage + 1).toString();
+  } else {
+    page.nextPage = "2";
+  }
   const response = await axios.get<InvidiousSearchVideo[]>(url);
   const tracks = response.data.map(invdiousSearchVideoToTrack);
 
   const trackResults: SearchTrackResult = {
     items: tracks,
+    pageInfo: page,
   };
   return trackResults;
 };
