@@ -157,13 +157,13 @@ export async function searchTracksYoutube(
   let urlWithQuery = `${url}?part=id&type=video&maxResults=50&key=${getApiKey()}&q=${encodeURIComponent(
     request.query
   )}`;
-  if (request.page) {
-    if (request.page.nextPage) {
+  if (request.pageInfo) {
+    if (request.pageInfo.nextPage) {
       // Next Page
-      urlWithQuery += `&pageToken=${request.page.nextPage}`;
-    } else if (request.page.prevPage) {
+      urlWithQuery += `&pageToken=${request.pageInfo.nextPage}`;
+    } else if (request.pageInfo.prevPage) {
       // Prev P1ge
-      urlWithQuery += `&pageToken=${request.page.prevPage}`;
+      urlWithQuery += `&pageToken=${request.pageInfo.prevPage}`;
     }
   }
 
@@ -183,7 +183,7 @@ export async function searchTracksYoutube(
     pageInfo: {
       totalResults: results.data.pageInfo?.totalResults || 0,
       resultsPerPage: results.data.pageInfo?.resultsPerPage || 0,
-      offset: request.page ? request.page.offset : 0,
+      offset: request.pageInfo ? request.pageInfo.offset : 0,
       nextPage: results.data.nextPageToken,
       prevPage: results.data.prevPageToken,
     },
@@ -198,13 +198,13 @@ export async function searchPlaylistsYoutube(
   let urlWithQuery = `${url}?part=snippet&type=playlist&maxResults=50&key=${getApiKey()}&q=${encodeURIComponent(
     request.query
   )}`;
-  if (request.page) {
-    if (request.page.nextPage) {
+  if (request.pageInfo) {
+    if (request.pageInfo.nextPage) {
       // Next Page
-      urlWithQuery += `&pageToken=${request.page.nextPage}`;
-    } else if (request.page.prevPage) {
+      urlWithQuery += `&pageToken=${request.pageInfo.nextPage}`;
+    } else if (request.pageInfo.prevPage) {
       // Prev P1ge
-      urlWithQuery += `&pageToken=${request.page.prevPage}`;
+      urlWithQuery += `&pageToken=${request.pageInfo.prevPage}`;
     }
   }
   const results =
@@ -216,7 +216,7 @@ export async function searchPlaylistsYoutube(
     pageInfo: {
       totalResults: results.data.pageInfo?.totalResults || 0,
       resultsPerPage: results.data.pageInfo?.resultsPerPage || 0,
-      offset: request.page ? request.page.offset : 0,
+      offset: request.pageInfo ? request.pageInfo.offset : 0,
       nextPage: results.data.nextPageToken,
       prevPage: results.data.prevPageToken,
     },
@@ -234,13 +234,13 @@ export async function getPlaylistTracksYoutube(
   if (request.isUserPlaylist) {
     urlWithQuery += "&mine=true";
   }
-  if (request.page) {
-    if (request.page.nextPage) {
+  if (request.pageInfo) {
+    if (request.pageInfo.nextPage) {
       // Next Page
-      urlWithQuery += `&pageToken=${request.page.nextPage}`;
-    } else if (request.page.prevPage) {
+      urlWithQuery += `&pageToken=${request.pageInfo.nextPage}`;
+    } else if (request.pageInfo.prevPage) {
       // Prev P1ge
-      urlWithQuery += `&pageToken=${request.page.prevPage}`;
+      urlWithQuery += `&pageToken=${request.pageInfo.prevPage}`;
     }
   }
   const instance = request.isUserPlaylist ? http : axios;
@@ -262,7 +262,7 @@ export async function getPlaylistTracksYoutube(
     pageInfo: {
       totalResults: result.data.pageInfo?.totalResults || 0,
       resultsPerPage: result.data.pageInfo?.resultsPerPage || 0,
-      offset: request.page ? request.page.offset : 0,
+      offset: request.pageInfo ? request.pageInfo.offset : 0,
       nextPage: result.data.nextPageToken,
       prevPage: result.data.prevPageToken,
     },
@@ -284,7 +284,7 @@ export async function getUserPlaylistsYoutube(
     pageInfo: {
       totalResults: result.data.pageInfo?.totalResults || 0,
       resultsPerPage: result.data.pageInfo?.resultsPerPage || 0,
-      offset: request.page ? request.page.offset : 0,
+      offset: request.pageInfo ? request.pageInfo.offset : 0,
       nextPage: result.data.nextPageToken,
       prevPage: result.data.prevPageToken,
     },

@@ -144,16 +144,16 @@ export const searchTracksInvidious = async (
   let url = `${instance}/api/v1/search?q=${request.query}&type=video`;
   let page: PageInfo = {
     resultsPerPage: 20,
-    offset: request.page?.offset || 0,
+    offset: request.pageInfo?.offset || 0,
   };
-  if (request.page?.nextPage) {
-    url += `&page=${request.page.nextPage}`;
-    const currentPage = parseInt(request.page.nextPage);
+  if (request.pageInfo?.nextPage) {
+    url += `&page=${request.pageInfo.nextPage}`;
+    const currentPage = parseInt(request.pageInfo.nextPage);
     page.prevPage = (currentPage - 1).toString();
     page.nextPage = (currentPage + 1).toString();
-  } else if (request.page?.prevPage) {
-    url += `&page=${request.page.prevPage}`;
-    const currentPage = parseInt(request.page.prevPage);
+  } else if (request.pageInfo?.prevPage) {
+    url += `&page=${request.pageInfo.prevPage}`;
+    const currentPage = parseInt(request.pageInfo.prevPage);
     page.prevPage = (currentPage - 1).toString();
     page.nextPage = (currentPage + 1).toString();
   } else {
@@ -176,16 +176,16 @@ export const searchPlaylistsInvidious = async (
   let url = `${instance}/api/v1/search?q=${request.query}&type=playlist`;
   let page: PageInfo = {
     resultsPerPage: 20,
-    offset: request.page?.offset || 0,
+    offset: request.pageInfo?.offset || 0,
   };
-  if (request.page?.nextPage) {
-    url += `&page=${request.page.nextPage}`;
-    const currentPage = parseInt(request.page.nextPage);
+  if (request.pageInfo?.nextPage) {
+    url += `&page=${request.pageInfo.nextPage}`;
+    const currentPage = parseInt(request.pageInfo.nextPage);
     page.prevPage = (currentPage - 1).toString();
     page.nextPage = (currentPage + 1).toString();
-  } else if (request.page?.prevPage) {
-    url += `&page=${request.page.prevPage}`;
-    const currentPage = parseInt(request.page.prevPage);
+  } else if (request.pageInfo?.prevPage) {
+    url += `&page=${request.pageInfo.prevPage}`;
+    const currentPage = parseInt(request.pageInfo.prevPage);
     page.prevPage = (currentPage - 1).toString();
     page.nextPage = (currentPage + 1).toString();
   } else {
