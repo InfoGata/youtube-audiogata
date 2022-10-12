@@ -1,5 +1,4 @@
 import { MessageType, UiMessageType } from "./shared";
-import "audiogata-plugin-typings";
 //import { getYoutubeTrackPiped } from "./piped";
 import {
   fetchInstances,

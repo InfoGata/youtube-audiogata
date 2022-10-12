@@ -10,7 +10,7 @@
     "@mui/icons-material": "^5.8.4",
     "@mui/material": "5.1.0",
     "@types/google-apps-script": "^1.0.47",
-    "audiogata-plugin-typings": "1.0.1",
+    "@infogata/audiogata-plugin-typings": "1.0.3",
     "axios": "^0.21.1",
     "iso8601-duration": "^1.3.0",
     "preact": "^10.7.2"
