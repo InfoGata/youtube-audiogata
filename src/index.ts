@@ -70,6 +70,9 @@ application.onUiMessage = async (message: UiMessageType) => {
       const instance = await getRandomInstance();
       sendMessage({ type: "sendinstance", instance });
       break;
+    default:
+      const _exhaustive: never = message;
+      break;
   }
 };
 async function searchTracks(
