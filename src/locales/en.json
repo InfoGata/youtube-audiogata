@@ -1,0 +1,13 @@
+{
+  "common": {
+    "save": "save",
+    "clear": "Clear",
+    "getDifferentInstance": "Get Different Instance",
+    "advancedConfiguration": "Advanced Configuration",
+    "logout": "Logout",
+    "login": "Login",
+    "supplyOwnKeys": "Supplying your own keys",
+    "addRedirectUri": "{{redirectUri}} needs be added to 'Authorized Javascript URIs'",
+    "apiKeysSaved": "Api Keys saved!"
+  }
+}

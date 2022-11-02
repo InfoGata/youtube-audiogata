@@ -1,4 +1,6 @@
 import axios from "axios";
+import en from "./locales/en.json";
+
 export const CLIENT_ID =
   "125446267595-noltpkn42520oq1sh4h6cnn41f135n1s.apps.googleusercontent.com";
 export const TOKEN_SERVER =
@@ -7,6 +9,15 @@ const AUTH_SCOPE = "https://www.googleapis.com/auth/youtube.readonly";
 const AUTH_URL = "https://accounts.google.com/o/oauth2/auth";
 export const TOKEN_URL = "https://oauth2.googleapis.com/token";
 export const REDIRECT_PATH = "/login_popup.html";
+
+const locales: Record<string, {} | undefined> = {
+  en,
+};
+
+export const localeStringToLocale = (localeString: string) => {
+  const locale = locales[localeString];
+  return locale ? locale : en;
+};
 
 type UiCheckLoginType = {
   type: "check-login";
@@ -49,6 +60,7 @@ type InfoType = {
   clientId: string;
   clientSecret: string;
   instance: string;
+  locale: string;
 };
 
 type SendInstance = {
