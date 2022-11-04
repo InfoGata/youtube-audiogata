@@ -5,5 +5,6 @@
   "script": "dist/index.js",
   "options": "dist/options.html",
   "description": "Plugin for playing music from youtube.com",
-  "updateUrl": "https://cdn.jsdelivr.net/gh/InfoGata/youtube-audiogata@latest/manifest.json"
+  "updateUrl": "https://cdn.jsdelivr.net/gh/InfoGata/youtube-audiogata@latest/manifest.json",
+  "homepage": "https://github.com/InfoGata/youtube-audiogata"
 }
