@@ -54,7 +54,7 @@ const App: FunctionComponent = () => {
         case "info":
           setRedirectUri(event.data.origin + REDIRECT_PATH);
           setPluginId(event.data.pluginId);
-          setApiKey(event.data.clientId);
+          setApiKey(event.data.apiKey);
           setClientId(event.data.clientId);
           setClientSecret(event.data.clientSecret);
           setInstance(event.data.instance);
