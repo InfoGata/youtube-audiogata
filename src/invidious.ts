@@ -16,6 +16,7 @@ interface InvidiousVideoReponse {
   recommendedVideos: InvidiousRecommendedVideo[];
   adaptiveFormats: InvidiousAdaptiveFormat[];
   formatStreams: InvidiousFormatStream[];
+  videoThumbnails: ImageInfo[];
   published: number;
 }
 
@@ -265,4 +266,21 @@ export async function getYoutubeTrackInvidious(
     .sort((a, b) => parseInt(b.bitrate) - parseInt(a.bitrate));
   const youtubeUrl = sortedArray[0].url;
   return youtubeUrl;
+}
+
+export async function getTrackFromApiIdInvidious(
+  apiId: string
+): Promise<Track> {
+  const instance = await getCurrentInstance();
+  const url = `${instance}/api/v1/videos/${apiId}`;
+
+  const response = await axios.get<InvidiousVideoReponse>(url);
+  const data = response.data;
+  const track: Track = {
+    name: data.title,
+    apiId: apiId,
+    duration: data.lengthSeconds,
+    images: data.videoThumbnails,
+  };
+  return track;
 }

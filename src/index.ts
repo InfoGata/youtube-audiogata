@@ -5,6 +5,7 @@ import {
   getCurrentInstance,
   getPlaylistTracksInvidious,
   getRandomInstance,
+  getTrackFromApiIdInvidious,
   getYoutubeTrackInvidious,
   searchPlaylistsInvidious,
   searchTracksInvidious,
@@ -88,6 +89,10 @@ async function searchTracks(
   return searchTracksInvidious(request);
 }
 
+async function getTrack(request: GetTrackRequest): Promise<Track> {
+  return getTrackFromApiIdInvidious(request.apiId);
+}
+
 async function searchPlaylists(
   request: SearchRequest
 ): Promise<SearchPlaylistResult> {
@@ -131,6 +136,7 @@ application.onSearchPlaylists = searchPlaylists;
 application.onGetTrackUrl = getTrackUrl;
 application.onGetPlaylistTracks = getPlaylistTracks;
 application.onGetTopItems = getTopItems;
+application.onGetTrack = getTrack;
 
 application.onDeepLinkMessage = async (message: string) => {
   application.postUiMessage({ type: "deeplink", url: message });
