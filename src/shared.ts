@@ -39,13 +39,19 @@ type UiSetKeysType = {
 type UiGetInstanceType = {
   type: "getinstnace";
 };
+type UiResolveUrls = {
+  type: "resolve-urls";
+  trackUrls: string;
+  playlistId: string;
+};
 
 export type UiMessageType =
   | UiCheckLoginType
   | UiLoginType
   | UiLogoutType
   | UiSetKeysType
-  | UiGetInstanceType;
+  | UiGetInstanceType
+  | UiResolveUrls;
 
 type LoginType = {
   type: "login";
@@ -61,6 +67,7 @@ type InfoType = {
   clientSecret: string;
   instance: string;
   locale: string;
+  playlists: PlaylistInfo[];
 };
 
 type SendInstance = {

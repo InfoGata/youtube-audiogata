@@ -2,6 +2,7 @@ import axios from "axios";
 import { parse, toSeconds } from "iso8601-duration";
 import { TOKEN_URL } from "./shared";
 
+const key = "AIzaSyBYUoAxdG5OvUtnxH0HbBioIiF14Ce7RZ0";
 const http = axios.create();
 
 export const setTokens = (accessToken: string, refreshToken?: string) => {
@@ -132,8 +133,6 @@ function playlistSearchResultToPlaylist(
   );
 }
 
-const key = "AIzaSyBYUoAxdG5OvUtnxH0HbBioIiF14Ce7RZ0";
-
 export async function getTopItemsYoutube(): Promise<SearchAllResult> {
   const url = "https://www.googleapis.com/youtube/v3/videos";
   const apiKey = getApiKey() || key;
@@ -224,6 +223,18 @@ export async function searchPlaylistsYoutube(
   return playlistResults;
 }
 
+export async function getTracksFromVideosIds(ids: string[]) {
+  const idList = ids.join(",");
+  const detailsUrl = "https://www.googleapis.com/youtube/v3/videos";
+  const apiKey = getApiKey() || key;
+  const detailsUrlWithQuery = `${detailsUrl}?key=${apiKey}&part=snippet,contentDetails&id=${idList}`;
+  const detailsResults =
+    await axios.get<GoogleAppsScript.YouTube.Schema.VideoListResponse>(
+      detailsUrlWithQuery
+    );
+  return resultToTrackYoutube(detailsResults.data);
+}
+
 export async function getPlaylistTracksYoutube(
   request: PlaylistTrackRequest
 ): Promise<PlaylistTracksResult> {
@@ -248,17 +259,13 @@ export async function getPlaylistTracksYoutube(
     await instance.get<GoogleAppsScript.YouTube.Schema.PlaylistItemListResponse>(
       urlWithQuery
     );
-  const detailsUrl = "https://www.googleapis.com/youtube/v3/videos";
-  const ids = result.data.items
-    ?.map((i) => i.contentDetails?.videoId)
-    .join(",");
-  const detailsUrlWithQuery = `${detailsUrl}?key=${getApiKey()}&part=snippet,contentDetails&id=${ids}`;
-  const detailsResults =
-    await axios.get<GoogleAppsScript.YouTube.Schema.VideoListResponse>(
-      detailsUrlWithQuery
-    );
+  const ids =
+    result.data.items
+      ?.map((i) => i.contentDetails?.videoId)
+      .filter((i): i is string => !!i) || [];
+  const items = await getTracksFromVideosIds(ids);
   const trackResults: SearchTrackResult = {
-    items: resultToTrackYoutube(detailsResults.data),
+    items: items,
     pageInfo: {
       totalResults: result.data.pageInfo?.totalResults || 0,
       resultsPerPage: result.data.pageInfo?.resultsPerPage || 0,

@@ -5,8 +5,13 @@ import {
   Box,
   Button,
   CssBaseline,
+  FormControl,
   IconButton,
   InputAdornment,
+  InputLabel,
+  MenuItem,
+  Select,
+  SelectChangeEvent,
   Stack,
   TextField,
   Typography,
@@ -32,6 +37,8 @@ const sendUiMessage = (message: UiMessageType) => {
 
 const App: FunctionComponent = () => {
   const [accessToken, setAccessToken] = useState("");
+  const [playlists, setPlaylists] = useState<PlaylistInfo[]>([]);
+  const [playlistId, setPlaylistId] = useState("");
   const [pluginId, setPluginId] = useState("");
   const [redirectUri, setRedirectUri] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -42,6 +49,7 @@ const App: FunctionComponent = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [instance, setInstance] = useState("");
   const [locale, setLocale] = useState<{}>(en);
+  const [trackUrls, setTrackUrls] = useState("");
 
   useEffect(() => {
     const onNewWindowMessage = (event: MessageEvent<MessageType>) => {
@@ -59,6 +67,7 @@ const App: FunctionComponent = () => {
           setClientSecret(event.data.clientSecret);
           setInstance(event.data.instance);
           setLocale(localeStringToLocale(event.data.locale));
+          setPlaylists(event.data.playlists);
           if (event.data.clientId) {
             setShowAdvanced(true);
             setUseOwnKeys(true);
@@ -153,6 +162,12 @@ const App: FunctionComponent = () => {
 
   const getInstance = () => {
     sendUiMessage({ type: "getinstnace" });
+  };
+
+  const saveTrackUrl = () => {
+    if (playlistId) {
+      sendUiMessage({ type: "resolve-urls", trackUrls, playlistId });
+    }
   };
 
   return (
@@ -266,6 +281,36 @@ const App: FunctionComponent = () => {
             <Text id="getDifferentInstance">
               {en.common.getDifferentInstance}
             </Text>
+          </Button>
+          <Typography>
+            <Text id="addTracksByUrl">{en.common.addTracksByUrl}</Text>:
+          </Typography>
+          <TextField
+            value={trackUrls}
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setTrackUrls(value);
+            }}
+            multiline
+            rows={2}
+          />
+          <FormControl fullWidth>
+            <InputLabel htmlFor="playlist-select">Playlist</InputLabel>
+            <Select
+              labelId="playlist-select"
+              value={playlistId}
+              onChange={(e) => {
+                const v = e.target && "value" in e.target ? e.target.value : "";
+                setPlaylistId(v);
+              }}
+            >
+              {playlists.map((p) => (
+                <MenuItem value={p.id}>{p.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button variant="contained" onClick={saveTrackUrl}>
+            <Text id="save">{en.common.save}</Text>
           </Button>
         </Stack>
       </Box>

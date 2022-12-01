@@ -15,6 +15,7 @@ import {
   getTopItemsYoutube,
   getUserPlaylistsYoutube,
   setTokens,
+  getTracksFromVideosIds,
 } from "./youtube";
 import { translate } from "preact-i18n";
 
@@ -30,6 +31,7 @@ const sendInfo = async () => {
   const origin = `${document.location.protocol}//${domain}`;
   const pluginId = await application.getPluginId();
   const locale = await application.getLocale();
+  const playlists = await application.getPlaylistsInfo();
   const apiKey = localStorage.getItem("apiKey") ?? "";
   const clientId = localStorage.getItem("clientId") ?? "";
   const clientSecret = localStorage.getItem("clientSecret") ?? "";
@@ -43,7 +45,37 @@ const sendInfo = async () => {
     clientSecret,
     instance,
     locale,
+    playlists,
   });
+};
+
+const resolveUrls = async (urlStrings: string[]) => {
+  const ids: string[] = [];
+  urlStrings.forEach((u) => {
+    try {
+      const url = new URL(u);
+      const videoId = url.searchParams.get("v");
+      if (videoId) {
+        ids.push(videoId);
+      }
+    } catch {}
+  });
+
+  // Max number of ids that youtube api allows is 50
+  const length = ids.length;
+  const limit = 50;
+  let start = 0;
+  let end = limit;
+  const results: Track[] = [];
+  while (start < length) {
+    const idSlice = ids.slice(start, end);
+    const tracks = await getTracksFromVideosIds(idSlice);
+    results.push(...tracks);
+    start += limit;
+    end += limit;
+  }
+
+  return results;
 };
 
 application.onUiMessage = async (message: UiMessageType) => {
@@ -78,11 +110,19 @@ application.onUiMessage = async (message: UiMessageType) => {
       const instance = await getRandomInstance();
       sendMessage({ type: "sendinstance", instance });
       break;
+    case "resolve-urls":
+      console.log(message.trackUrls);
+      const tracks = await resolveUrls(message.trackUrls.split("\n"));
+      console.log(tracks);
+      await application.addTracksToPlaylist(message.playlistId, tracks);
+      application.createNotification({ message: "Success!" });
+      break;
     default:
       const _exhaustive: never = message;
       break;
   }
 };
+
 async function searchTracks(
   request: SearchRequest
 ): Promise<SearchTrackResult> {
