@@ -49,7 +49,26 @@ const sendInfo = async () => {
   });
 };
 
-const resolveUrls = async (urlStrings: string[]) => {
+const importPlaylist = async (url: string): Promise<Playlist> => {
+  const youtubeUrl = new URL(url);
+  const listId = youtubeUrl.searchParams.get("list");
+  if (listId) {
+    const playlistResponse = await getPlaylistTracks({
+      apiId: listId,
+      isUserPlaylist: false,
+    });
+
+    const playlist: Playlist = {
+      ...playlistResponse.playlist,
+      tracks: playlistResponse.items,
+    };
+
+    return playlist;
+  }
+  throw new Error("Couldn't retreive playlist");
+};
+
+const resolveTracksUrls = async (urlStrings: string[]) => {
   const ids: string[] = [];
   urlStrings.forEach((u) => {
     try {
@@ -111,9 +130,7 @@ application.onUiMessage = async (message: UiMessageType) => {
       sendMessage({ type: "sendinstance", instance });
       break;
     case "resolve-urls":
-      console.log(message.trackUrls);
-      const tracks = await resolveUrls(message.trackUrls.split("\n"));
-      console.log(tracks);
+      const tracks = await resolveTracksUrls(message.trackUrls.split("\n"));
       await application.addTracksToPlaylist(message.playlistId, tracks);
       application.createNotification({ message: "Success!" });
       break;
@@ -177,6 +194,17 @@ application.onGetTrackUrl = getTrackUrl;
 application.onGetPlaylistTracks = getPlaylistTracks;
 application.onGetTopItems = getTopItems;
 application.onGetTrack = getTrack;
+application.onLookupPlaylistUrl = importPlaylist;
+application.onCanParseUrl = async (url: string, type: ParseUrlType) => {
+  if (!/https?:\/\/(www\.)?youtube.com\/watch\?v=.*/.test(url)) return false;
+
+  switch (type) {
+    case "playlist":
+      return new URL(url).searchParams.has("list");
+    default:
+      return false;
+  }
+};
 
 application.onDeepLinkMessage = async (message: string) => {
   application.postUiMessage({ type: "deeplink", url: message });
