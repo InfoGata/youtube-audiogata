@@ -1,5 +1,5 @@
 import { localeStringToLocale, MessageType, UiMessageType } from "./shared";
-//import { getYoutubeTrackPiped } from "./piped";
+import { getYoutubeTrackPiped } from "./piped";
 import {
   fetchInstances,
   getCurrentInstance,
@@ -184,7 +184,12 @@ async function searchAll(request: SearchRequest): Promise<SearchAllResult> {
 }
 
 async function getTrackUrl(track: GetTrackUrlRequest): Promise<string> {
-  return getYoutubeTrackInvidious(track);
+  // Used piped then fallback to invidious
+  try {
+    return await getYoutubeTrackPiped(track);
+  } catch {
+    return await getYoutubeTrackInvidious(track);
+  }
 }
 
 application.onSearchAll = searchAll;
