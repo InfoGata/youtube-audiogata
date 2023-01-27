@@ -23,6 +23,8 @@ const sendMessage = (message: MessageType) => {
   application.postUiMessage(message);
 };
 
+let defaultErrored = false;
+
 const sendInfo = async () => {
   const host = document.location.host;
   const hostArray = host.split(".");
@@ -186,8 +188,19 @@ async function searchAll(request: SearchRequest): Promise<SearchAllResult> {
 async function getTrackUrl(track: GetTrackUrlRequest): Promise<string> {
   // Used piped then fallback to invidious
   try {
-    return await getYoutubeTrackPiped(track);
+    if (defaultErrored) {
+      return await getYoutubeTrackInvidious(track);
+    } else {
+      const timeoutMs = 6000;
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(), timeoutMs);
+      });
+      const urlPromise = getYoutubeTrackPiped(track);
+      await Promise.all([urlPromise, timeoutPromise]);
+      return await urlPromise;
+    }
   } catch {
+    defaultErrored = true;
     return await getYoutubeTrackInvidious(track);
   }
 }
