@@ -111,6 +111,7 @@ function resultToTrackYoutube(
         })
       ),
     name: i.snippet?.title || "",
+    originalUrl: `https://www.youtube.com/watch?v=${i.id}`,
   }));
 }
 

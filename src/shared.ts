@@ -132,3 +132,11 @@ export const getToken = async (
   });
   return result.data;
 };
+
+export const getYoutubeTrackUrl = (apiId: string): string => {
+  return `https://www.youtube.com/watch?v=${apiId}`;
+};
+
+export const getYoutubePlaylistUrl = (apiId: string) => {
+  return `https://www.youtube.com/playlist?list=${apiId}`;
+};

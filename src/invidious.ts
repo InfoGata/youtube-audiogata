@@ -1,5 +1,9 @@
 import axios from "axios";
-import { StorageType } from "./shared";
+import {
+  getYoutubePlaylistUrl,
+  getYoutubeTrackUrl,
+  StorageType,
+} from "./shared";
 
 interface InvidiousVideoReponse {
   title: string;
@@ -126,6 +130,7 @@ const invdiousSearchVideoToTrack = (result: InvidiousSearchVideo): Track => {
     apiId: result.videoId,
     images: result.videoThumbnails,
     duration: result.lengthSeconds,
+    originalUrl: getYoutubeTrackUrl(result.videoId),
   };
 };
 
@@ -199,6 +204,7 @@ export const searchPlaylistsInvidious = async (
       name: d.title,
       apiId: d.playlistId,
       images: d.videos.length > 0 ? d.videos[0].videoThumbnails : [],
+      originalUrl: getYoutubePlaylistUrl(d.playlistId),
     })
   );
 
@@ -239,6 +245,7 @@ export const getPlaylistTracksInvidious = async (
     name: result.title,
     apiId: result.playlistId,
     images: result.videos.length > 0 ? result.videos[0].videoThumbnails : [],
+    originalUrl: getYoutubePlaylistUrl(result.playlistId),
   };
   const tracks = result.videos.map(
     (v): Track => ({
@@ -246,6 +253,7 @@ export const getPlaylistTracksInvidious = async (
       apiId: v.videoId,
       images: v.videoThumbnails,
       duration: v.lengthSeconds,
+      originalUrl: getYoutubeTrackUrl(v.videoId),
     })
   );
 
@@ -281,6 +289,7 @@ export async function getTrackFromApiIdInvidious(
     apiId: apiId,
     duration: data.lengthSeconds,
     images: data.videoThumbnails,
+    originalUrl: getYoutubeTrackUrl(apiId),
   };
   return track;
 }
