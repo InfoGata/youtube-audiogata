@@ -223,6 +223,12 @@ application.onCanParseUrl = async (url: string, type: ParseUrlType) => {
       return false;
   }
 };
+application.onLookupTrack = async (request: LookupTrackRequest) => {
+  const search = await searchTracks({
+    query: `${request.artistName} - ${request.trackName}`,
+  });
+  return search.items[0];
+};
 
 application.onDeepLinkMessage = async (message: string) => {
   application.postUiMessage({ type: "deeplink", url: message });

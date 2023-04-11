@@ -1,13 +1,13 @@
 {
   "name": "youtube-audiogata",
-  "version": "1.5.3",
+  "version": "1.6.0",
   "description": "",
   "author": "",
   "license": "MIT",
   "dependencies": {
     "@emotion/react": "^11.10.4",
     "@emotion/styled": "^11.10.4",
-    "@infogata/audiogata-plugin-typings": "1.7.1",
+    "@infogata/audiogata-plugin-typings": "1.8.0",
     "@mui/icons-material": "^5.10.9",
     "@mui/material": "^5.10.9",
     "@types/google-apps-script": "^1.0.47",
