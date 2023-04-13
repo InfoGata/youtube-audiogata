@@ -124,6 +124,20 @@ export const getCurrentInstance = async (): Promise<string> => {
   return instance;
 };
 
+const sendRequest = async <T>(path: string) => {
+  let instance = await getCurrentInstance();
+  try {
+    const url = `${instance}/${path}`;
+    const request = await axios.get<T>(url);
+    return request;
+  } catch {
+    instance = await getRandomInstance();
+    const url = `${instance}/${path}`;
+    const request = await axios.get<T>(url);
+    return request;
+  }
+};
+
 const invdiousSearchVideoToTrack = (result: InvidiousSearchVideo): Track => {
   return {
     name: result.title,
@@ -135,9 +149,8 @@ const invdiousSearchVideoToTrack = (result: InvidiousSearchVideo): Track => {
 };
 
 export const getTrendingInvidious = async (): Promise<Track[]> => {
-  const instance = await getCurrentInstance();
-  const url = `${instance}/api/v1/trending?type=music`;
-  const response = await axios.get<InvidiousSearchVideo[]>(url);
+  const path = `/api/v1/trending?type=music`;
+  const response = await sendRequest<InvidiousSearchVideo[]>(path);
   const tracks = response.data.map(invdiousSearchVideoToTrack);
 
   return tracks;
@@ -146,26 +159,25 @@ export const getTrendingInvidious = async (): Promise<Track[]> => {
 export const searchTracksInvidious = async (
   request: SearchRequest
 ): Promise<SearchTrackResult> => {
-  const instance = await getCurrentInstance();
-  let url = `${instance}/api/v1/search?q=${request.query}&type=video`;
+  let path = `/api/v1/search?q=${request.query}&type=video`;
   let page: PageInfo = {
     resultsPerPage: 20,
     offset: request.pageInfo?.offset || 0,
   };
   if (request.pageInfo?.nextPage) {
-    url += `&page=${request.pageInfo.nextPage}`;
+    path += `&page=${request.pageInfo.nextPage}`;
     const currentPage = parseInt(request.pageInfo.nextPage);
     page.prevPage = (currentPage - 1).toString();
     page.nextPage = (currentPage + 1).toString();
   } else if (request.pageInfo?.prevPage) {
-    url += `&page=${request.pageInfo.prevPage}`;
+    path += `&page=${request.pageInfo.prevPage}`;
     const currentPage = parseInt(request.pageInfo.prevPage);
     page.prevPage = (currentPage - 1).toString();
     page.nextPage = (currentPage + 1).toString();
   } else {
     page.nextPage = "2";
   }
-  const response = await axios.get<InvidiousSearchVideo[]>(url);
+  const response = await sendRequest<InvidiousSearchVideo[]>(path);
   const tracks = response.data.map(invdiousSearchVideoToTrack);
 
   const trackResults: SearchTrackResult = {
@@ -178,26 +190,25 @@ export const searchTracksInvidious = async (
 export const searchPlaylistsInvidious = async (
   request: SearchRequest
 ): Promise<SearchPlaylistResult> => {
-  const instance = await getCurrentInstance();
-  let url = `${instance}/api/v1/search?q=${request.query}&type=playlist`;
+  let path = `/api/v1/search?q=${request.query}&type=playlist`;
   let page: PageInfo = {
     resultsPerPage: 20,
     offset: request.pageInfo?.offset || 0,
   };
   if (request.pageInfo?.nextPage) {
-    url += `&page=${request.pageInfo.nextPage}`;
+    path += `&page=${request.pageInfo.nextPage}`;
     const currentPage = parseInt(request.pageInfo.nextPage);
     page.prevPage = (currentPage - 1).toString();
     page.nextPage = (currentPage + 1).toString();
   } else if (request.pageInfo?.prevPage) {
-    url += `&page=${request.pageInfo.prevPage}`;
+    path += `&page=${request.pageInfo.prevPage}`;
     const currentPage = parseInt(request.pageInfo.prevPage);
     page.prevPage = (currentPage - 1).toString();
     page.nextPage = (currentPage + 1).toString();
   } else {
     page.nextPage = "2";
   }
-  const response = await axios.get<InvidiousSearchPlaylist[]>(url);
+  const response = await sendRequest<InvidiousSearchPlaylist[]>(path);
 
   const playlists = response.data.map(
     (d): PlaylistInfo => ({
@@ -237,9 +248,8 @@ interface InvidiousPlaylistVideo {
 export const getPlaylistTracksInvidious = async (
   request: PlaylistTrackRequest
 ): Promise<PlaylistTracksResult> => {
-  const instance = await getCurrentInstance();
-  let url = `${instance}/api/v1/playlists/${request.apiId}`;
-  const response = await axios.get<InvidiousPlaylist>(url);
+  let path = `/api/v1/playlists/${request.apiId}`;
+  const response = await sendRequest<InvidiousPlaylist>(path);
   const result = response.data;
   const playlist: PlaylistInfo = {
     name: result.title,
@@ -266,9 +276,8 @@ export const getPlaylistTracksInvidious = async (
 export async function getYoutubeTrackInvidious(
   track: GetTrackUrlRequest
 ): Promise<string> {
-  const instance = await getCurrentInstance();
-  const url = `${instance}/api/v1/videos/${track.apiId}`;
-  const response = await axios.get<InvidiousVideoReponse>(url);
+  const path = `/api/v1/videos/${track.apiId}`;
+  const response = await sendRequest<InvidiousVideoReponse>(path);
   const sortedArray = response.data.adaptiveFormats
     .filter((a) => !!a.audioQuality)
     .sort((a, b) => parseInt(b.bitrate) - parseInt(a.bitrate));
@@ -279,10 +288,8 @@ export async function getYoutubeTrackInvidious(
 export async function getTrackFromApiIdInvidious(
   apiId: string
 ): Promise<Track> {
-  const instance = await getCurrentInstance();
-  const url = `${instance}/api/v1/videos/${apiId}`;
-
-  const response = await axios.get<InvidiousVideoReponse>(url);
+  const path = `/api/v1/videos/${apiId}`;
+  const response = await sendRequest<InvidiousVideoReponse>(path);
   const data = response.data;
   const track: Track = {
     name: data.title,
