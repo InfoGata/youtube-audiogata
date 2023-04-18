@@ -1,4 +1,4 @@
-import { localeStringToLocale, MessageType, UiMessageType } from "./shared";
+import { MessageType, UiMessageType } from "./shared";
 import { getYoutubeTrackPiped } from "./piped";
 import {
   fetchInstances,
@@ -6,7 +6,6 @@ import {
   getPlaylistTracksInvidious,
   getRandomInstance,
   getTrackFromApiIdInvidious,
-  getYoutubeTrackInvidious,
   searchPlaylistsInvidious,
   searchTracksInvidious,
 } from "./invidious";
@@ -17,7 +16,6 @@ import {
   setTokens,
   getTracksFromVideosIds,
 } from "./youtube";
-import { translate } from "preact-i18n";
 
 const sendMessage = (message: MessageType) => {
   application.postUiMessage(message);
@@ -119,11 +117,7 @@ application.onUiMessage = async (message: UiMessageType) => {
       localStorage.setItem("apiKey", message.apiKey);
       localStorage.setItem("clientId", message.clientId);
       localStorage.setItem("clientSecret", message.clientSecret);
-
-      const localeString = await application.getLocale();
-      const locale = localeStringToLocale(localeString);
-      const notificationText = translate("apiKeysSaved", "common", locale);
-      application.createNotification({ message: notificationText });
+      application.createNotification({ message: "Api Keys saved!" });
       break;
     case "getinstnace":
       const instance = await getRandomInstance();
@@ -187,6 +181,25 @@ async function getTrackUrl(track: GetTrackUrlRequest): Promise<string> {
   return await getYoutubeTrackPiped(track);
 }
 
+export async function canParseUrl(
+  url: string,
+  type: ParseUrlType
+): Promise<boolean> {
+  const playlistRegex = /^.*(youtu.be\/|list=)([^#\&\?]*).*/;
+  const videoRegex =
+    /^(?:https?:\/\/)?(?:www\.)?(?:m\.)?(?:youtube\.com|youtu.be)\/(?:watch\?v=|embed\/|v\/)?([a-zA-Z0-9_-]+)(?:\S+)?$/;
+  if (!playlistRegex.test(url) && !videoRegex.test(url)) {
+    return false;
+  }
+
+  switch (type) {
+    case "playlist":
+      return new URL(url).searchParams.has("list");
+    default:
+      return false;
+  }
+}
+
 application.onSearchAll = searchAll;
 application.onSearchTracks = searchTracks;
 application.onSearchPlaylists = searchPlaylists;
@@ -195,16 +208,8 @@ application.onGetPlaylistTracks = getPlaylistTracks;
 application.onGetTopItems = getTopItems;
 application.onGetTrack = getTrack;
 application.onLookupPlaylistUrl = importPlaylist;
-application.onCanParseUrl = async (url: string, type: ParseUrlType) => {
-  if (!/https?:\/\/(www\.)?youtube.com\/watch\?v=.*/.test(url)) return false;
+application.onCanParseUrl = canParseUrl;
 
-  switch (type) {
-    case "playlist":
-      return new URL(url).searchParams.has("list");
-    default:
-      return false;
-  }
-};
 application.onLookupTrack = async (request: LookupTrackRequest) => {
   const search = await searchTracks({
     query: `${request.artistName} - ${request.trackName}`,
@@ -214,10 +219,6 @@ application.onLookupTrack = async (request: LookupTrackRequest) => {
 
 application.onDeepLinkMessage = async (message: string) => {
   application.postUiMessage({ type: "deeplink", url: message });
-};
-
-window.fetch = function () {
-  return application.networkRequest.apply(this, arguments as any);
 };
 
 const init = async () => {
