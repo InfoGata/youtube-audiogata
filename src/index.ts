@@ -195,6 +195,8 @@ export async function canParseUrl(
   switch (type) {
     case "playlist":
       return new URL(url).searchParams.has("list");
+    case "track":
+      return true;
     default:
       return false;
   }
@@ -208,6 +210,7 @@ application.onGetPlaylistTracks = getPlaylistTracks;
 application.onGetTopItems = getTopItems;
 application.onGetTrack = getTrack;
 application.onLookupPlaylistUrl = importPlaylist;
+application.onLookupTrackUrls = resolveTracksUrls;
 application.onCanParseUrl = canParseUrl;
 
 application.onLookupTrack = async (request: LookupTrackRequest) => {

@@ -16,9 +16,15 @@ describe("index", () => {
     expect(canParse).toBeTruthy();
   });
 
-  test("canParseUrl should return false on videos", async () => {
+  test("canParseUrl should return false on videos if type is playlist", async () => {
     const url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
     const canParse = await canParseUrl(url, "playlist");
     expect(canParse).toBeFalsy();
+  });
+
+  test("canParseUrl should return true on videos if type is track", async () => {
+    const url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+    const canParse = await canParseUrl(url, "track");
+    expect(canParse).toBeTruthy();
   });
 });
