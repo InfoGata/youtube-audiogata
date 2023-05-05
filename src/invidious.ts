@@ -127,12 +127,12 @@ export const getCurrentInstance = async (): Promise<string> => {
 const sendRequest = async <T>(path: string) => {
   let instance = await getCurrentInstance();
   try {
-    const url = `${instance}/${path}`;
+    const url = `${instance}${path}`;
     const request = await axios.get<T>(url);
     return request;
   } catch {
     instance = await getRandomInstance();
-    const url = `${instance}/${path}`;
+    const url = `${instance}${path}`;
     const request = await axios.get<T>(url);
     return request;
   }
