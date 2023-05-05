@@ -30,7 +30,14 @@ export async function getYoutubeTrackPiped(
   const instance = instances[instanceIndex];
   try {
     const url = `${instance}/streams/${track.apiId}?timestamp=${timestamp}`;
-    const response = await axios.get<PipedApiResponse>(url);
+    const timeoutMs = 10000;
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(), timeoutMs);
+    });
+    const responsePromise = axios.get<PipedApiResponse>(url);
+    await Promise.race([responsePromise, timeoutPromise]);
+
+    const response = await responsePromise;
     const sortedArray = response.data.audioStreams.sort(
       (a, b) => b.bitrate - a.bitrate
     );
