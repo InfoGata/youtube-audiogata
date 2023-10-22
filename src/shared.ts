@@ -1,5 +1,6 @@
 import axios from "axios";
 import en from "./locales/en.json";
+import { LocalGasStationRounded } from "@mui/icons-material";
 
 export const CLIENT_ID =
   "125446267595-noltpkn42520oq1sh4h6cnn41f135n1s.apps.googleusercontent.com";
@@ -17,6 +18,45 @@ const locales: Record<string, {} | undefined> = {
 export const localeStringToLocale = (localeString: string) => {
   const locale = locales[localeString];
   return locale ? locale : en;
+};
+
+export const storage: Storage = {
+  get length() {
+    try {
+      return localStorage.length;
+    } catch {
+      return 0;
+    }
+  },
+  clear: function (): void {
+    try {
+      localStorage.clear();
+    } catch {}
+  },
+  getItem: function (key: string): string | null {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  removeItem: function (key: string): void {
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+  },
+  setItem: function (key: string, value: string): void {
+    try {
+      localStorage.setItem(key, value);
+    } catch {}
+  },
+  key: function (index: number): string | null {
+    try {
+      return localStorage.key(index);
+    } catch {
+      return null;
+    }
+  },
 };
 
 type UiCheckLoginType = {
