@@ -1,7 +1,7 @@
 {
   "id": "5WWSzBORLfZgym533u87I",
   "name": "Plugin for Youtube",
-  "version": "1.8.3",
+  "version": "1.8.4",
   "script": "dist/index.js",
   "options": "dist/options.html",
   "description": "Plugin for playing music from youtube.com",
