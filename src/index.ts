@@ -70,10 +70,11 @@ const resolveTracksUrls = async (urlStrings: string[]) => {
   const ids: string[] = [];
   urlStrings.forEach((u) => {
     try {
-      const url = new URL(u);
-      const videoId = url.searchParams.get("v");
-      if (videoId) {
-        ids.push(videoId);
+      const videoRegex =
+        /^(?:https?:\/\/)?(?:www\.)?(?:m\.)?(?:youtube\.com|youtu.be)\/(?:watch\?v=|embed\/|v\/)?([a-zA-Z0-9_-]+)(?:\S+)?$/;
+      const match = u.match(videoRegex);
+      if (match) {
+        ids.push(match[1]);
       }
     } catch {}
   });
