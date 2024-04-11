@@ -225,7 +225,16 @@ application.onDeepLinkMessage = async (message: string) => {
   application.postUiMessage({ type: "deeplink", url: message });
 };
 
+const changeTheme = (theme: Theme) => {
+  localStorage.setItem("kb-color-mode", theme);
+};
+application.onChangeTheme = async (theme: Theme) => {
+  changeTheme(theme);
+};
+
 const init = async () => {
+  const theme = await application.getTheme();
+  changeTheme(theme);
   const accessToken = storage.getItem("access_token");
   if (accessToken) {
     application.onGetUserPlaylists = getUserPlaylistsYoutube;

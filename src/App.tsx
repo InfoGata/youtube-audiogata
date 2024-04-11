@@ -1,57 +1,53 @@
+import * as i18n from "@solid-primitives/i18n";
+import { createEffect, createMemo, createSignal } from "solid-js";
 import {
   Accordion,
-  AccordionDetails,
-  AccordionSummary,
-  Box,
-  Button,
-  CssBaseline,
-  FormControl,
-  IconButton,
-  InputAdornment,
-  InputLabel,
-  MenuItem,
-  Select,
-  SelectChangeEvent,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
-import { useEffect, useState } from "preact/hooks";
-import { FunctionComponent, JSX } from "preact";
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "./components/ui/accordion";
+import { Button } from "./components/ui/button";
+import { Input } from "./components/ui/input";
+import en from "./locales/en.json";
 import {
   getAuthUrl,
   getToken,
-  localeStringToLocale,
   MessageType,
   REDIRECT_PATH,
   UiMessageType,
 } from "./shared";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import { VisibilityOff, Visibility } from "@mui/icons-material";
-import en from "./locales/en.json";
-import { IntlProvider, Text, translate } from "preact-i18n";
 
 const sendUiMessage = (message: UiMessageType) => {
   parent.postMessage(message, "*");
 };
 
-const App: FunctionComponent = () => {
-  const [accessToken, setAccessToken] = useState("");
-  const [playlists, setPlaylists] = useState<PlaylistInfo[]>([]);
-  const [playlistId, setPlaylistId] = useState("");
-  const [pluginId, setPluginId] = useState("");
-  const [redirectUri, setRedirectUri] = useState("");
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [useOwnKeys, setUseOwnKeys] = useState(false);
-  const [apiKey, setApiKey] = useState("");
-  const [clientId, setClientId] = useState("");
-  const [clientSecret, setClientSecret] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [instance, setInstance] = useState("");
-  const [locale, setLocale] = useState<{}>(en);
-  const [trackUrls, setTrackUrls] = useState("");
+export type Locale = "en";
+type Dict = typeof en;
 
-  useEffect(() => {
+const dictionaries: Record<Locale, Dict> = {
+  en: en,
+};
+
+const validLocales = ["en"] as const;
+const isValidLocale = (value: unknown): value is Locale =>
+  validLocales.includes(value as Locale);
+
+const App = () => {
+  const [accessToken, setAccessToken] = createSignal("");
+  const [pluginId, setPluginId] = createSignal("");
+  const [redirectUri, setRedirectUri] = createSignal("");
+  const [useOwnKeys, setUseOwnKeys] = createSignal(false);
+  const [apiKey, setApiKey] = createSignal("");
+  const [clientId, setClientId] = createSignal("");
+  const [clientSecret, setClientSecret] = createSignal("");
+  const [instance, setInstance] = createSignal("");
+  const [locale, setLocale] = createSignal<Locale>("en");
+
+  const dict = createMemo(() => i18n.flatten(dictionaries[locale()]));
+
+  const t = i18n.translator(dict, i18n.resolveTemplate);
+
+  createEffect(() => {
     const onNewWindowMessage = (event: MessageEvent<MessageType>) => {
       switch (event.data.type) {
         case "login":
@@ -66,10 +62,11 @@ const App: FunctionComponent = () => {
           setClientId(event.data.clientId);
           setClientSecret(event.data.clientSecret);
           setInstance(event.data.instance);
-          setLocale(localeStringToLocale(event.data.locale));
-          setPlaylists(event.data.playlists);
+          const locale = isValidLocale(event.data.locale)
+            ? event.data.locale
+            : "en";
+          setLocale(locale);
           if (event.data.clientId) {
-            setShowAdvanced(true);
             setUseOwnKeys(true);
           }
           break;
@@ -84,17 +81,17 @@ const App: FunctionComponent = () => {
     window.addEventListener("message", onNewWindowMessage);
     sendUiMessage({ type: "check-login" });
     return () => window.removeEventListener("message", onNewWindowMessage);
-  }, []);
+  });
 
   const onLogin = () => {
-    const url = getAuthUrl(redirectUri, pluginId, clientId);
+    const url = getAuthUrl(redirectUri(), pluginId(), clientId());
     const newWindow = window.open(url);
 
     const onMessage = async (returnUrl: string) => {
       const url = new URL(returnUrl);
       const code = url.searchParams.get("code");
       if (code) {
-        const response = await getToken(code, redirectUri);
+        const response = await getToken(code, redirectUri());
         if (response.access_token) {
           sendUiMessage({
             type: "login",
@@ -129,9 +126,9 @@ const App: FunctionComponent = () => {
     setUseOwnKeys(!!clientId);
     sendUiMessage({
       type: "set-keys",
-      clientId: clientId,
-      clientSecret: clientSecret,
-      apiKey: apiKey,
+      clientId: clientId(),
+      clientSecret: clientSecret(),
+      apiKey: apiKey(),
     });
   };
 
@@ -148,173 +145,86 @@ const App: FunctionComponent = () => {
     });
   };
 
-  const onAccordionChange = (_: any, expanded: boolean) => {
-    setShowAdvanced(expanded);
-  };
-
-  const handleClickShowPassword = () => {
-    setShowPassword(!showPassword);
-  };
-
-  const handleMouseDownPassword = (event: JSX.TargetedEvent) => {
-    event.preventDefault();
-  };
-
   const getInstance = () => {
     sendUiMessage({ type: "getinstnace" });
   };
 
-  const saveTrackUrl = () => {
-    if (playlistId) {
-      sendUiMessage({ type: "resolve-urls", trackUrls, playlistId });
-    }
-  };
-
   return (
-    <IntlProvider definition={locale} scope="common">
-      <Box sx={{ display: "flex" }}>
-        <CssBaseline />
-        <Stack spacing={2}>
-          {accessToken ? (
-            <div>
-              <Button variant="contained" onClick={onLogout}>
-                <Text id="logout">{en.common.logout}</Text>
-              </Button>
-            </div>
-          ) : (
-            <div>
-              <Accordion expanded={showAdvanced} onChange={onAccordionChange}>
-                <AccordionSummary
-                  expandIcon={<ExpandMoreIcon />}
-                  aria-controls="panel1d-content"
-                  id="panel1d-header"
-                >
-                  <Typography>
-                    <Text id="advancedConfiguration">
-                      {en.common.advancedConfiguration}
-                    </Text>
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Button
-                    variant="contained"
-                    onClick={onLogin}
-                    disabled={!useOwnKeys}
-                  >
-                    <Text id="login">{en.common.login}</Text>
-                  </Button>
-                  <Typography>
-                    <Text id="supplyOwnKeys">{en.common.supplyOwnKeys}</Text>:
-                  </Typography>
-                  <Typography>
-                    <Text id="addRedirectUri" fields={{ redirectUri }}>
-                      {translate("addRedirectUri", "common", en, {
-                        redirectUri,
+    <div class="flex">
+      <div class="flex flex-col gap-2 w-full">
+        {accessToken() ? (
+          <div>
+            <Button onClick={onLogout}>{t("common.logout")}</Button>
+          </div>
+        ) : (
+          <div>
+            <Accordion multiple collapsible>
+              <AccordionItem value="item-1">
+                <AccordionTrigger>
+                  {t("common.advancedConfiguration")}
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div class="flex flex-col gap-4 m-4">
+                    <Button onClick={onLogin} disabled={!useOwnKeys}>
+                      {t("common.login")}
+                    </Button>
+                    <p>{t("common.supplyOwnKeys")}</p>
+                    <p>
+                      {t("common.addRedirectUri", {
+                        redirectUri: redirectUri(),
                       })}
-                    </Text>
-                  </Typography>
-                  <div>
-                    <TextField
-                      label="Api Key"
-                      value={apiKey}
-                      onChange={(e) => {
-                        const value = e.currentTarget.value;
-                        setApiKey(value);
-                      }}
-                    />
-                    <TextField
-                      label="Client ID"
-                      value={clientId}
-                      onChange={(e) => {
-                        const value = e.currentTarget.value;
-                        setClientId(value);
-                      }}
-                    />
-                    <TextField
-                      type={showPassword ? "text" : "password"}
-                      label="Client Secret"
-                      value={clientSecret}
-                      onChange={(e) => {
-                        const value = e.currentTarget.value;
-                        setClientSecret(value);
-                      }}
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              aria-label="toggle password visibility"
-                              onClick={handleClickShowPassword}
-                              onMouseDown={handleMouseDownPassword}
-                              edge="end"
-                            >
-                              {showPassword ? (
-                                <VisibilityOff />
-                              ) : (
-                                <Visibility />
-                              )}
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                      <Input
+                        placeholder="Api Key"
+                        value={apiKey()}
+                        onChange={(e) => {
+                          const value = e.currentTarget.value;
+                          setApiKey(value);
+                        }}
+                      />
+                      <Input
+                        placeholder="Client ID"
+                        value={clientId()}
+                        onChange={(e) => {
+                          const value = e.currentTarget.value;
+                          setClientId(value);
+                        }}
+                      />
+                      <Input
+                        type="password"
+                        placeholder="Client Secret"
+                        value={clientSecret()}
+                        onChange={(e) => {
+                          const value = e.currentTarget.value;
+                          setClientSecret(value);
+                        }}
+                      />
+                    </div>
+                    <div class="flex gap-2">
+                      <Button onClick={onSaveKeys}>{t("common.save")}</Button>
+                      <Button
+                        variant="destructive"
+                        onClick={onClearKeys}
+                        color="error"
+                      >
+                        {t("common.clear")}
+                      </Button>
+                    </div>
                   </div>
-                  <Stack spacing={2} direction="row">
-                    <Button variant="contained" onClick={onSaveKeys}>
-                      <Text id="save">{en.common.save}</Text>
-                    </Button>
-                    <Button
-                      variant="contained"
-                      onClick={onClearKeys}
-                      color="error"
-                    >
-                      <Text id="clear">{en.common.clear}</Text>
-                    </Button>
-                  </Stack>
-                </AccordionDetails>
-              </Accordion>
-            </div>
-          )}
-          <Box sx={{ width: "100%" }}>
-            <TextField value={instance} fullWidth disabled />
-          </Box>
-          <Button onClick={getInstance}>
-            <Text id="getDifferentInstance">
-              {en.common.getDifferentInstance}
-            </Text>
-          </Button>
-          <Typography>
-            <Text id="addTracksByUrl">{en.common.addTracksByUrl}</Text>:
-          </Typography>
-          <TextField
-            value={trackUrls}
-            onChange={(e) => {
-              const value = e.currentTarget.value;
-              setTrackUrls(value);
-            }}
-            multiline
-            rows={2}
-          />
-          <FormControl fullWidth>
-            <InputLabel htmlFor="playlist-select">Playlist</InputLabel>
-            <Select
-              labelId="playlist-select"
-              value={playlistId}
-              onChange={(e) => {
-                const v = e.target && "value" in e.target ? e.target.value : "";
-                setPlaylistId(v);
-              }}
-            >
-              {playlists.map((p) => (
-                <MenuItem value={p.id}>{p.name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Button variant="contained" onClick={saveTrackUrl}>
-            <Text id="save">{en.common.save}</Text>
-          </Button>
-        </Stack>
-      </Box>
-    </IntlProvider>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
+        )}
+        <div class="w-full">
+          <Input value={instance()} disabled />
+        </div>
+        <Button onClick={getInstance}>
+          {t("common.getDifferentInstance")}
+        </Button>
+      </div>
+    </div>
   );
 };
 
