@@ -1,20 +1,20 @@
-import { MessageType, UiMessageType, storage } from "./shared";
-import { getYoutubeTrackPiped } from "./piped";
 import {
   fetchInstances,
   getCurrentInstance,
   getPlaylistTracksInvidious,
   getRandomInstance,
   getTrackFromApiIdInvidious,
+  getYoutubeTrackInvidious,
   searchPlaylistsInvidious,
   searchTracksInvidious,
 } from "./invidious";
+import { MessageType, UiMessageType, storage } from "./shared";
 import {
   getPlaylistTracksYoutube,
   getTopItemsYoutube,
+  getTracksFromVideosIds,
   getUserPlaylistsYoutube,
   setTokens,
-  getTracksFromVideosIds,
 } from "./youtube";
 
 const sendMessage = (message: MessageType) => {
@@ -179,7 +179,7 @@ async function searchAll(request: SearchRequest): Promise<SearchAllResult> {
 }
 
 async function getTrackUrl(track: GetTrackUrlRequest): Promise<string> {
-  return await getYoutubeTrackPiped(track);
+  return await getYoutubeTrackInvidious(track);
 }
 
 export async function canParseUrl(

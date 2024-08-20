@@ -277,7 +277,7 @@ export const getPlaylistTracksInvidious = async (
 export async function getYoutubeTrackInvidious(
   track: GetTrackUrlRequest
 ): Promise<string> {
-  const path = `/api/v1/videos/${track.apiId}`;
+  const path = `/api/v1/videos/${track.apiId}?local=true`;
   const response = await sendRequest<InvidiousVideoReponse>(path);
   const sortedArray = response.data.adaptiveFormats
     .filter((a) => !!a.audioQuality)
