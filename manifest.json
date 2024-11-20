@@ -6,5 +6,12 @@
   "options": "dist/options.html",
   "description": "Plugin for playing music from youtube.com",
   "updateUrl": "https://cdn.jsdelivr.net/gh/InfoGata/youtube-audiogata@latest/manifest.json",
-  "homepage": "https://github.com/InfoGata/youtube-audiogata"
+  "homepage": "https://github.com/InfoGata/youtube-audiogata",
+  "authentication": {
+    "loginUrl": "https://accounts.google.com/ServiceLogin?service=youtube&uilel=3&passive=true&continue=https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue%26app%3Ddesktop%26hl%3Den%26next%3Dhttps%253A%252F%252Fwww.youtube.com%252Fchannel_switcher&hl=en&ec=65620",
+    "domainHeadersToFind": {
+      ".youtube.com": ["Authorization"]
+    },
+    "cookiesToFind": ["SIDCC"]
+  }
 }
