@@ -1,14 +1,14 @@
+import { MessageType, UiMessageType, storage } from "./shared";
 import {
   fetchInstances,
   getCurrentInstance,
-  getPlaylistTracksInvidious,
-  getRandomInstance,
-  getTrackFromApiIdInvidious,
-  getYoutubeTrackInvidious,
-  searchPlaylistsInvidious,
-  searchTracksInvidious,
-} from "./invidious";
-import { MessageType, UiMessageType, storage } from "./shared";
+  getInstance,
+  getPlaylistTracksPiped,
+  searchTracksPiped,
+  searchPlaylistsPiped,
+  getYoutubeTrackPiped,
+  getTrackByApiIdPiped
+} from "./piped";
 import {
   getPlaylistTracksYoutube,
   getTopItemsYoutube,
@@ -16,6 +16,7 @@ import {
   getUserPlaylistsYoutube,
   setTokens,
 } from "./youtube";
+import { getTrackFromApiIdInvidious } from "./invidious";
 
 const sendMessage = (message: MessageType) => {
   application.postUiMessage(message);
@@ -121,7 +122,7 @@ application.onUiMessage = async (message: UiMessageType) => {
       application.createNotification({ message: "Api Keys saved!" });
       break;
     case "getinstnace":
-      const instance = await getRandomInstance();
+      const instance = await getInstance();
       sendMessage({ type: "sendinstance", instance });
       break;
     case "resolve-urls":
@@ -138,7 +139,7 @@ application.onUiMessage = async (message: UiMessageType) => {
 async function searchTracks(
   request: SearchRequest
 ): Promise<SearchTrackResult> {
-  return searchTracksInvidious(request);
+  return searchTracksPiped(request);
 }
 
 async function getTrack(request: GetTrackRequest): Promise<Track> {
@@ -148,7 +149,7 @@ async function getTrack(request: GetTrackRequest): Promise<Track> {
 async function searchPlaylists(
   request: SearchRequest
 ): Promise<SearchPlaylistResult> {
-  return searchPlaylistsInvidious(request);
+  return searchPlaylistsPiped(request);
 }
 
 async function getPlaylistTracks(
@@ -157,7 +158,7 @@ async function getPlaylistTracks(
   if (request.isUserPlaylist) {
     return getPlaylistTracksYoutube(request);
   }
-  return getPlaylistTracksInvidious(request);
+  return getPlaylistTracksPiped(request);
 }
 
 async function getTopItems(): Promise<SearchAllResult> {
@@ -179,7 +180,7 @@ async function searchAll(request: SearchRequest): Promise<SearchAllResult> {
 }
 
 async function getTrackUrl(track: GetTrackUrlRequest): Promise<string> {
-  return await getYoutubeTrackInvidious(track);
+  return await getYoutubeTrackPiped(track);
 }
 
 export async function canParseUrl(

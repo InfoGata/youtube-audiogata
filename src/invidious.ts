@@ -1,4 +1,4 @@
-import axios from "axios";
+import ky from "ky";
 import {
   getYoutubePlaylistUrl,
   getYoutubeTrackUrl,
@@ -89,8 +89,7 @@ interface InvidiousSearchPlaylistVideo {
 
 export const fetchInstances = async () => {
   const instancesUrl = "https://api.invidious.io/instances.json";
-  const response = await axios.get<InvidiousInstance[]>(instancesUrl);
-  let instances = response.data;
+  let instances = await ky.get<InvidiousInstance[]>(instancesUrl).json();
   instances = instances.filter((instance) =>
     instance[0].includes(".onion") || instance[0].includes(".i2p")
       ? false
@@ -98,12 +97,12 @@ export const fetchInstances = async () => {
   );
   // Only use instances that uses cors
   instances = instances.filter((instance) => instance[1].cors);
-  storage.setItem(StorageType.Instances, JSON.stringify(instances));
+  storage.setItem(StorageType.InvidiousInstances, JSON.stringify(instances));
   return instances;
 };
 
 export const getRandomInstance = async (): Promise<string> => {
-  const instanceString = storage.getItem(StorageType.Instances);
+  const instanceString = storage.getItem(StorageType.InvidiousInstances);
   let instances: InvidiousInstance[] = [];
   if (instanceString) {
     instances = JSON.parse(instanceString);
@@ -113,12 +112,12 @@ export const getRandomInstance = async (): Promise<string> => {
   const randomIndex = Math.floor(Math.random() * instances.length);
   const newInstance = instances[randomIndex][1].uri;
 
-  storage.setItem(StorageType.CurrentInstance, newInstance);
+  storage.setItem(StorageType.InvidiousCurrentInstance, newInstance);
   return newInstance;
 };
 
 export const getCurrentInstance = async (): Promise<string> => {
-  let instance = storage.getItem(StorageType.CurrentInstance);
+  let instance = storage.getItem(StorageType.InvidiousCurrentInstance);
   if (!instance) {
     instance = await getRandomInstance();
   }
@@ -129,12 +128,12 @@ const sendRequest = async <T>(path: string) => {
   let instance = await getCurrentInstance();
   try {
     const url = `${instance}${path}`;
-    const request = await axios.get<T>(url);
+    const request = await ky.get<T>(url).json();
     return request;
   } catch {
     instance = await getRandomInstance();
     const url = `${instance}${path}`;
-    const request = await axios.get<T>(url);
+    const request = await ky.get<T>(url).json();
     return request;
   }
 };
@@ -152,7 +151,7 @@ const invdiousSearchVideoToTrack = (result: InvidiousSearchVideo): Track => {
 export const getTrendingInvidious = async (): Promise<Track[]> => {
   const path = `/api/v1/trending?type=music`;
   const response = await sendRequest<InvidiousSearchVideo[]>(path);
-  const tracks = response.data.map(invdiousSearchVideoToTrack);
+  const tracks = response.map(invdiousSearchVideoToTrack);
 
   return tracks;
 };
@@ -179,7 +178,7 @@ export const searchTracksInvidious = async (
     page.nextPage = "2";
   }
   const response = await sendRequest<InvidiousSearchVideo[]>(path);
-  const tracks = response.data.map(invdiousSearchVideoToTrack);
+  const tracks = response.map(invdiousSearchVideoToTrack);
 
   const trackResults: SearchTrackResult = {
     items: tracks,
@@ -211,7 +210,7 @@ export const searchPlaylistsInvidious = async (
   }
   const response = await sendRequest<InvidiousSearchPlaylist[]>(path);
 
-  const playlists = response.data.map(
+  const playlists = response.map(
     (d): PlaylistInfo => ({
       name: d.title,
       apiId: d.playlistId,
@@ -250,8 +249,7 @@ export const getPlaylistTracksInvidious = async (
   request: PlaylistTrackRequest
 ): Promise<PlaylistTracksResult> => {
   let path = `/api/v1/playlists/${request.apiId}`;
-  const response = await sendRequest<InvidiousPlaylist>(path);
-  const result = response.data;
+  const result = await sendRequest<InvidiousPlaylist>(path);
   const playlist: PlaylistInfo = {
     name: result.title,
     apiId: result.playlistId,
@@ -279,7 +277,7 @@ export async function getYoutubeTrackInvidious(
 ): Promise<string> {
   const path = `/api/v1/videos/${track.apiId}?local=true`;
   const response = await sendRequest<InvidiousVideoReponse>(path);
-  const sortedArray = response.data.adaptiveFormats
+  const sortedArray = response.adaptiveFormats
     .filter((a) => !!a.audioQuality)
     .sort((a, b) => parseInt(b.bitrate) - parseInt(a.bitrate));
   const youtubeUrl = sortedArray[0].url;
@@ -290,8 +288,7 @@ export async function getTrackFromApiIdInvidious(
   apiId: string
 ): Promise<Track> {
   const path = `/api/v1/videos/${apiId}`;
-  const response = await sendRequest<InvidiousVideoReponse>(path);
-  const data = response.data;
+  const data = await sendRequest<InvidiousVideoReponse>(path);
   const track: Track = {
     name: data.title,
     apiId: apiId,

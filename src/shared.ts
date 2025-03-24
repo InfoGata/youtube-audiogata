@@ -1,4 +1,4 @@
-import axios from "axios";
+import ky from "ky";
 import en from "./locales/en.json";
 
 export const CLIENT_ID =
@@ -108,8 +108,10 @@ type SendInstance = {
 export type MessageType = LoginType | InfoType | SendInstance;
 
 export const enum StorageType {
-  Instances = "instances",
-  CurrentInstance = "current-instance",
+  PipedInstances = "piped-instances",
+  PipedCurrentInstance = "piped-current-instance",
+  InvidiousInstances = "invidious-instances",
+  InvidiousCurrentInstance = "invidious-current-instance",
 }
 
 export interface TokenResponse {
@@ -155,12 +157,13 @@ export const getToken = async (
     params.append("client_secret", clientSecret);
     tokenUrl = TOKEN_URL;
   }
-  const result = await axios.post<TokenResponse>(tokenUrl, params, {
+  const result = await ky.post<TokenResponse>(tokenUrl, {
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
     },
-  });
-  return result.data;
+    body: params,
+  }).json();;
+  return result;
 };
 
 export const getYoutubeTrackUrl = (apiId: string): string => {
