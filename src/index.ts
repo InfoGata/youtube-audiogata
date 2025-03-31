@@ -218,6 +218,7 @@ application.onGetTrack = getTrack;
 application.onLookupPlaylistUrl = importPlaylist;
 application.onLookupTrackUrls = resolveTracksUrls;
 application.onCanParseUrl = canParseUrl;
+application.onGetSearchSuggestions = getSuggestions;
 
 application.onLookupTrack = async (request: LookupTrackRequest) => {
   const search = await searchTracks({
