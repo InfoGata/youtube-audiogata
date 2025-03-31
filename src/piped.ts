@@ -199,6 +199,11 @@ interface PipedPlaylistSearchItem {
   playlistType: string;
   videos: number;
 }
+ 
+interface PipedSearchSuggestionsResponse {
+  0: string;
+  1: string[];
+}
 
 const relatedStreamToVideo = (stream: PipedRelatedStream): Track => ({
   name: stream.title,
@@ -352,3 +357,10 @@ export const getPlaylistTracksPiped = async (request: PlaylistTrackRequest): Pro
     pageInfo,
   }
 }
+
+export const onGetPipedSearchSuggestions = async (request: GetSearchSuggestionsRequest): Promise<string[]> => {
+  const instance = await getCurrentInstance();
+  const url = `${instance}/opensearch/suggestions?query=${request.query}`;
+  const response = await ky.get<PipedSearchSuggestionsResponse>(url).json();
+  return response[1];
+};

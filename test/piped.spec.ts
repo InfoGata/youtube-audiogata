@@ -7,6 +7,7 @@ import {
   searchPlaylistsPiped,
   getPlaylistTracksPiped,
   getYoutubeTrackPiped,
+  onGetPipedSearchSuggestions,
 } from "../src/piped";
 
 describe("piped.ts integration tests", () => {
@@ -53,6 +54,15 @@ describe("piped.ts integration tests", () => {
       expect(video.images?.length).toBeGreaterThan(0);
       expect(video.images?.[0]).toHaveProperty("url");
       expect(video).toHaveProperty("duration");
+    });
+  });
+
+  describe("onGetPipedSearchSuggestions", () => {
+    it("should return search suggestions for a query", async () => {
+      const suggestions = await onGetPipedSearchSuggestions({ query: "test" });
+      expect(Array.isArray(suggestions)).toBe(true);
+      expect(suggestions.length).toBeGreaterThan(0);
+      expect(typeof suggestions[0]).toBe("string");
     });
   });
 

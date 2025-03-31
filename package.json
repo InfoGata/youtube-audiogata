@@ -5,7 +5,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@infogata/audiogata-plugin-typings": "1.13.0",
+    "@infogata/audiogata-plugin-typings": "1.14.0",
     "@kobalte/core": "0.12.1",
     "@solid-primitives/i18n": "^2.1.1",
     "@tabler/icons-solidjs": "^3.1.0",

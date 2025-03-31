@@ -7,7 +7,8 @@ import {
   searchTracksPiped,
   searchPlaylistsPiped,
   getYoutubeTrackPiped,
-  getTrackByApiIdPiped
+  getTrackByApiIdPiped,
+  onGetPipedSearchSuggestions
 } from "./piped";
 import {
   getPlaylistTracksYoutube,
@@ -202,6 +203,9 @@ export async function canParseUrl(
     default:
       return false;
   }
+}
+export async function getSuggestions(request: GetSearchSuggestionsRequest) {
+  return onGetPipedSearchSuggestions(request);
 }
 
 application.onSearchAll = searchAll;
