@@ -1,5 +1,6 @@
 import ky from "ky";
 import { storage, StorageType } from "./shared";
+const defaultInstace = "https://piped.kavin.rocks";
 
 interface PipedApiResponse {
   videoStreams: PipedApiVideoStream[];
@@ -225,7 +226,12 @@ export const getInstance = async (): Promise<string> => {
   if (instanceString) {
     instances = JSON.parse(instanceString);
   } else {
-    instances = await fetchInstances();
+    try {
+      instances = await fetchInstances();
+    } catch (err) {
+      console.error(err);
+      return defaultInstace;
+    }
   }
   const newInstance = instances[0].api_url;
 
