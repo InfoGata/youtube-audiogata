@@ -1,7 +1,13 @@
+import { beforeAll, describe, expect, test } from "vitest";
+import { mockApplication } from "./mock-application";
 import { canParseUrl } from "../src/index";
 
+// Set up the mock application as the global application
+beforeAll(() => {
+  (global as any).application = mockApplication;
+});
+
 describe("index", () => {
-  (global as any).application = {};
   test("canParseUrl should detect youtube playlists", async () => {
     const url =
       "https://www.youtube.com/playlist?list=PLuUrokoVSgG6XWUdX-ZzSVzz1TgTJJbp4";
