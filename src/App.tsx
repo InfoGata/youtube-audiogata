@@ -1,5 +1,4 @@
-import * as i18n from "@solid-primitives/i18n";
-import { createEffect, createMemo, createSignal } from "solid-js";
+import { useState, useEffect, useMemo } from "preact/hooks";
 import {
   Accordion,
   AccordionContent,
@@ -32,22 +31,42 @@ const validLocales = ["en"] as const;
 const isValidLocale = (value: unknown): value is Locale =>
   validLocales.includes(value as Locale);
 
+type NestedKeyOf<T extends object> = {
+  [K in keyof T]: T[K] extends object
+    ? `${K & string}.${NestedKeyOf<T[K]> & string}`
+    : K;
+}[keyof T];
+
+type TranslationKey = NestedKeyOf<Dict>;
+
+const getNestedValue = (obj: any, path: string): string => {
+  return path.split(".").reduce((acc, part) => acc?.[part], obj) ?? path;
+};
+
 const App = () => {
-  const [accessToken, setAccessToken] = createSignal("");
-  const [pluginId, setPluginId] = createSignal("");
-  const [redirectUri, setRedirectUri] = createSignal("");
-  const [useOwnKeys, setUseOwnKeys] = createSignal(false);
-  const [apiKey, setApiKey] = createSignal("");
-  const [clientId, setClientId] = createSignal("");
-  const [clientSecret, setClientSecret] = createSignal("");
-  const [instance, setInstance] = createSignal("");
-  const [locale, setLocale] = createSignal<Locale>("en");
+  const [accessToken, setAccessToken] = useState("");
+  const [pluginId, setPluginId] = useState("");
+  const [redirectUri, setRedirectUri] = useState("");
+  const [useOwnKeys, setUseOwnKeys] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [instance, setInstance] = useState("");
+  const [locale, setLocale] = useState<Locale>("en");
 
-  const dict = createMemo(() => i18n.flatten(dictionaries[locale()]));
+  const dict = useMemo(() => dictionaries[locale], [locale]);
 
-  const t = i18n.translator(dict, i18n.resolveTemplate);
+  const t = (key: TranslationKey, params?: Record<string, string>): string => {
+    let value = getNestedValue(dict, key);
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        value = value.replace(`{{${k}}}`, v);
+      });
+    }
+    return value;
+  };
 
-  createEffect(() => {
+  useEffect(() => {
     const onNewWindowMessage = (event: MessageEvent<MessageType>) => {
       switch (event.data.type) {
         case "login":
@@ -62,10 +81,10 @@ const App = () => {
           setClientId(event.data.clientId);
           setClientSecret(event.data.clientSecret);
           setInstance(event.data.instance);
-          const locale = isValidLocale(event.data.locale)
+          const newLocale = isValidLocale(event.data.locale)
             ? event.data.locale
             : "en";
-          setLocale(locale);
+          setLocale(newLocale);
           if (event.data.clientId) {
             setUseOwnKeys(true);
           }
@@ -81,17 +100,22 @@ const App = () => {
     window.addEventListener("message", onNewWindowMessage);
     sendUiMessage({ type: "check-login" });
     return () => window.removeEventListener("message", onNewWindowMessage);
-  });
+  }, []);
 
   const onLogin = () => {
-    const url = getAuthUrl(redirectUri(), pluginId(), clientId());
+    const url = getAuthUrl(redirectUri, pluginId, clientId);
     const newWindow = window.open(url);
 
     const onMessage = async (returnUrl: string) => {
       const url = new URL(returnUrl);
       const code = url.searchParams.get("code");
       if (code) {
-        const response = await getToken(code, redirectUri());
+        const response = await getToken(
+          code,
+          redirectUri,
+          clientId,
+          clientSecret
+        );
         if (response.access_token) {
           sendUiMessage({
             type: "login",
@@ -126,9 +150,9 @@ const App = () => {
     setUseOwnKeys(!!clientId);
     sendUiMessage({
       type: "set-keys",
-      clientId: clientId(),
-      clientSecret: clientSecret(),
-      apiKey: apiKey(),
+      clientId: clientId,
+      clientSecret: clientSecret,
+      apiKey: apiKey,
     });
   };
 
@@ -150,63 +174,62 @@ const App = () => {
   };
 
   return (
-    <div class="flex">
-      <div class="flex flex-col gap-2 w-full">
-        {accessToken() ? (
+    <div className="flex">
+      <div className="flex flex-col gap-2 w-full">
+        {accessToken ? (
           <div>
             <Button onClick={onLogout}>{t("common.logout")}</Button>
           </div>
         ) : (
           <div>
-            <Accordion multiple collapsible>
+            <Accordion type="multiple">
               <AccordionItem value="item-1">
                 <AccordionTrigger>
                   {t("common.advancedConfiguration")}
                 </AccordionTrigger>
                 <AccordionContent>
-                  <div class="flex flex-col gap-4 m-4">
+                  <div className="flex flex-col gap-4 m-4">
                     <Button onClick={onLogin} disabled={!useOwnKeys}>
                       {t("common.login")}
                     </Button>
                     <p>{t("common.supplyOwnKeys")}</p>
                     <p>
                       {t("common.addRedirectUri", {
-                        redirectUri: redirectUri(),
+                        redirectUri: redirectUri,
                       })}
                     </p>
-                    <div class="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Input
                         placeholder="Api Key"
-                        value={apiKey()}
-                        onChange={(e) => {
-                          const value = e.currentTarget.value;
+                        value={apiKey}
+                        onChange={(e: any) => {
+                          const value = (e.target as HTMLInputElement).value;
                           setApiKey(value);
                         }}
                       />
                       <Input
                         placeholder="Client ID"
-                        value={clientId()}
-                        onChange={(e) => {
-                          const value = e.currentTarget.value;
+                        value={clientId}
+                        onChange={(e: any) => {
+                          const value = (e.target as HTMLInputElement).value;
                           setClientId(value);
                         }}
                       />
                       <Input
                         type="password"
                         placeholder="Client Secret"
-                        value={clientSecret()}
-                        onChange={(e) => {
-                          const value = e.currentTarget.value;
+                        value={clientSecret}
+                        onChange={(e: any) => {
+                          const value = (e.target as HTMLInputElement).value;
                           setClientSecret(value);
                         }}
                       />
                     </div>
-                    <div class="flex gap-2">
+                    <div className="flex gap-2">
                       <Button onClick={onSaveKeys}>{t("common.save")}</Button>
                       <Button
                         variant="destructive"
                         onClick={onClearKeys}
-                        color="error"
                       >
                         {t("common.clear")}
                       </Button>
@@ -217,8 +240,8 @@ const App = () => {
             </Accordion>
           </div>
         )}
-        <div class="w-full">
-          <Input value={instance()} disabled />
+        <div className="w-full">
+          <Input value={instance} disabled />
         </div>
         <Button onClick={getInstance}>
           {t("common.getDifferentInstance")}

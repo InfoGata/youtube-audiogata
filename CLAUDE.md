@@ -25,7 +25,7 @@ npm run test:coverage
 
 This is an AudioGata plugin for YouTube that provides audio streaming capabilities through multiple backends. The plugin has a dual-build system:
 
-1. **Options UI** (built with Vite + SolidJS): `src/options.tsx` → `dist/options.html`
+1. **Options UI** (built with Vite + Preact): `src/options.tsx` → `dist/options.html`
 2. **Plugin Core** (built with Vite): `src/index.ts` → `dist/index.js`
 
 ### Multi-Backend Architecture
@@ -56,11 +56,10 @@ Tests use Vitest with JSDOM environment. Mock implementations are in `test/mock-
 
 ## Configuration Files
 
-- `vite.config.ts`: Options page build config
-- `plugin.vite.config.ts`: Plugin core build config  
+- `vite.config.ts`: Options page build config (uses @preact/preset-vite and @tailwindcss/vite)
+- `plugin.vite.config.ts`: Plugin core build config
 - `vitest.config.ts`: Test configuration with JSDOM setup
-- `tailwind.config.js`: Tailwind CSS configuration
-- `ui.config.json`: UI component library config
+- `components.json`: shadcn/ui configuration
 
 ## Authentication
 
