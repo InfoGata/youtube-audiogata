@@ -31,13 +31,7 @@ const validLocales = ["en"] as const;
 const isValidLocale = (value: unknown): value is Locale =>
   validLocales.includes(value as Locale);
 
-type NestedKeyOf<T extends object> = {
-  [K in keyof T]: T[K] extends object
-    ? `${K & string}.${NestedKeyOf<T[K]> & string}`
-    : K;
-}[keyof T];
-
-type TranslationKey = NestedKeyOf<Dict>;
+type TranslationKey = string;
 
 const getNestedValue = (obj: any, path: string): string => {
   return path.split(".").reduce((acc, part) => acc?.[part], obj) ?? path;
@@ -51,7 +45,6 @@ const App = () => {
   const [apiKey, setApiKey] = useState("");
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
-  const [instance, setInstance] = useState("");
   const [locale, setLocale] = useState<Locale>("en");
 
   const dict = useMemo(() => dictionaries[locale], [locale]);
@@ -80,7 +73,6 @@ const App = () => {
           setApiKey(event.data.apiKey);
           setClientId(event.data.clientId);
           setClientSecret(event.data.clientSecret);
-          setInstance(event.data.instance);
           const newLocale = isValidLocale(event.data.locale)
             ? event.data.locale
             : "en";
@@ -88,9 +80,6 @@ const App = () => {
           if (event.data.clientId) {
             setUseOwnKeys(true);
           }
-          break;
-        case "sendinstance":
-          setInstance(event.data.instance);
           break;
         default:
           const _exhaustive: never = event.data;
@@ -169,10 +158,6 @@ const App = () => {
     });
   };
 
-  const getInstance = () => {
-    sendUiMessage({ type: "getinstnace" });
-  };
-
   return (
     <div className="flex">
       <div className="flex flex-col gap-2 w-full">
@@ -240,12 +225,6 @@ const App = () => {
             </Accordion>
           </div>
         )}
-        <div className="w-full">
-          <Input value={instance} disabled />
-        </div>
-        <Button onClick={getInstance}>
-          {t("common.getDifferentInstance")}
-        </Button>
       </div>
     </div>
   );
