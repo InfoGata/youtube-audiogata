@@ -1,23 +1,19 @@
 import { MessageType, UiMessageType, storage } from "./shared";
 import {
-  fetchInstances,
-  getCurrentInstance,
-  getInstance,
-  getPlaylistTracksPiped,
-  searchTracksPiped,
-  searchPlaylistsPiped,
-  getYoutubeTrackPiped,
-  getTrackByApiIdPiped,
-  onGetPipedSearchSuggestions
-} from "./piped";
-import {
   getPlaylistTracksYoutube,
   getTopItemsYoutube,
   getTracksFromVideosIds,
   getUserPlaylistsYoutube,
   setTokens,
 } from "./youtube";
-import { getTrackFromApiIdInvidious } from "./invidious";
+import {
+  getPlaylistTracksInnertube,
+  getSearchSuggestionsInnertube,
+  getTrackFromApiIdInnertube,
+  getTrackUrlInnertube,
+  searchPlaylistsInnertube,
+  searchTracksInnertube,
+} from "./innertube-api";
 
 const sendMessage = (message: MessageType) => {
   application.postUiMessage(message);
@@ -35,7 +31,6 @@ const sendInfo = async () => {
   const apiKey = storage.getItem("apiKey") ?? "";
   const clientId = storage.getItem("clientId") ?? "";
   const clientSecret = storage.getItem("clientSecret") ?? "";
-  const instance = await getCurrentInstance();
   sendMessage({
     type: "info",
     origin: origin,
@@ -43,7 +38,6 @@ const sendInfo = async () => {
     apiKey,
     clientId,
     clientSecret,
-    instance,
     locale,
     playlists,
   });
@@ -122,10 +116,6 @@ application.onUiMessage = async (message: UiMessageType) => {
       storage.setItem("clientSecret", message.clientSecret);
       application.createNotification({ message: "Api Keys saved!" });
       break;
-    case "getinstnace":
-      const instance = await getInstance();
-      sendMessage({ type: "sendinstance", instance });
-      break;
     case "resolve-urls":
       const tracks = await resolveTracksUrls(message.trackUrls.split("\n"));
       await application.addTracksToPlaylist(message.playlistId, tracks);
@@ -140,17 +130,17 @@ application.onUiMessage = async (message: UiMessageType) => {
 async function searchTracks(
   request: SearchRequest
 ): Promise<SearchTrackResult> {
-  return searchTracksPiped(request);
+  return searchTracksInnertube(request);
 }
 
 async function getTrack(request: GetTrackRequest): Promise<Track> {
-  return getTrackFromApiIdInvidious(request.apiId);
+  return getTrackFromApiIdInnertube(request.apiId);
 }
 
 async function searchPlaylists(
   request: SearchRequest
 ): Promise<SearchPlaylistResult> {
-  return searchPlaylistsPiped(request);
+  return searchPlaylistsInnertube(request);
 }
 
 async function getPlaylistTracks(
@@ -159,12 +149,11 @@ async function getPlaylistTracks(
   if (request.isUserPlaylist) {
     return getPlaylistTracksYoutube(request);
   }
-  return getPlaylistTracksPiped(request);
+  return getPlaylistTracksInnertube(request);
 }
 
 async function getTopItems(): Promise<SearchAllResult> {
-  const result = await getTopItemsYoutube();
-  return result;
+  return getTopItemsYoutube();
 }
 
 async function searchAll(request: SearchRequest): Promise<SearchAllResult> {
@@ -181,7 +170,7 @@ async function searchAll(request: SearchRequest): Promise<SearchAllResult> {
 }
 
 async function getTrackUrl(track: GetTrackUrlRequest): Promise<string> {
-  return await getYoutubeTrackPiped(track);
+  return await getTrackUrlInnertube(track);
 }
 
 export async function canParseUrl(
@@ -205,7 +194,7 @@ export async function canParseUrl(
   }
 }
 export async function getSuggestions(request: GetSearchSuggestionsRequest) {
-  return onGetPipedSearchSuggestions(request);
+  return getSearchSuggestionsInnertube(request);
 }
 
 application.onSearchAll = searchAll;
@@ -245,7 +234,6 @@ const init = async () => {
   if (accessToken) {
     application.onGetUserPlaylists = getUserPlaylistsYoutube;
   }
-  await fetchInstances();
 };
 
 init();

@@ -66,9 +66,6 @@ type UiSetKeysType = {
   clientId: string;
   clientSecret: string;
 };
-type UiGetInstanceType = {
-  type: "getinstnace";
-};
 type UiResolveUrls = {
   type: "resolve-urls";
   trackUrls: string;
@@ -80,7 +77,6 @@ export type UiMessageType =
   | UiLoginType
   | UiLogoutType
   | UiSetKeysType
-  | UiGetInstanceType
   | UiResolveUrls;
 
 type LoginType = {
@@ -95,24 +91,11 @@ type InfoType = {
   apiKey: string;
   clientId: string;
   clientSecret: string;
-  instance: string;
   locale: string;
   playlists: PlaylistInfo[];
 };
 
-type SendInstance = {
-  type: "sendinstance";
-  instance: string;
-};
-
-export type MessageType = LoginType | InfoType | SendInstance;
-
-export const enum StorageType {
-  PipedInstances = "piped-instances",
-  PipedCurrentInstance = "piped-current-instance",
-  InvidiousInstances = "invidious-instances",
-  InvidiousCurrentInstance = "invidious-current-instance",
-}
+export type MessageType = LoginType | InfoType;
 
 export interface TokenResponse {
   access_token: string;

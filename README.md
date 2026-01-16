@@ -6,6 +6,4 @@ An [audiogata](https://github.com/InfoGata/audiogata) plugin for playing audio f
 
 ## Credits
 
-[Invidious](https://github.com/iv-org/invidious)
-
-[Piped](https://github.com/TeamPiped/Piped)
+[youtubei.js](https://github.com/LuanRT/YouTube.js)

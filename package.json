@@ -6,6 +6,7 @@
   "license": "MIT",
   "dependencies": {
     "@infogata/audiogata-plugin-typings": "1.14.0",
+    "youtubei.js": "^16.0.1",
     "@infogata/shadcn-vite-theme-provider": "^0.1.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-slot": "^1.2.4",

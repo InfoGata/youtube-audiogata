@@ -28,27 +28,29 @@ This is an AudioGata plugin for YouTube that provides audio streaming capabiliti
 1. **Options UI** (built with Vite + Preact): `src/options.tsx` → `dist/options.html`
 2. **Plugin Core** (built with Vite): `src/index.ts` → `dist/index.js`
 
-### Multi-Backend Architecture
+### Backend Architecture
 
-The plugin uses three different YouTube backends for redundancy and reliability:
+The plugin uses two YouTube backends:
 
-- **Piped** (`src/piped.ts`): Primary backend for search and streaming
-- **Invidious** (`src/invidious.ts`): Secondary backend for track metadata
-- **YouTube API** (`src/youtube.ts`): Official API for authenticated features
+- **Innertube** (`src/innertube-api.ts`): Primary backend using the `youtubei.js` library for search, streaming, playlist retrieval, and suggestions
+- **YouTube API** (`src/youtube.ts`): Official API for authenticated features (user playlists) and API key operations
 
 ### Key Components
 
 - `src/index.ts`: Main plugin entry point, implements AudioGata plugin interface
-- `src/shared.ts`: Common storage utilities and message types
+- `src/innertube-api.ts`: Innertube integration using youtubei.js for core functionality
+- `src/youtube.ts`: YouTube Data API v3 integration for authenticated operations
+- `src/shared.ts`: Common storage utilities, OAuth helpers, and message types
 - `src/App.tsx`: Options page UI component
 - `manifest.json`: Plugin manifest with authentication config
 
 ### Data Flow
 
-1. Search requests → Piped API for video discovery
-2. Track metadata → Invidious API for detailed info
-3. Audio streaming → Piped API for stream URLs
-4. User playlists → YouTube API (requires authentication)
+1. Search requests → Innertube for video/playlist discovery
+2. Track metadata → Innertube for detailed info
+3. Audio streaming → Innertube for HLS manifest URLs
+4. Public playlists → Innertube for playlist tracks
+5. User playlists → YouTube API (requires authentication)
 
 ### Testing
 
