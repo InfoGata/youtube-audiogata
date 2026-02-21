@@ -7,6 +7,16 @@ export default defineConfig({
   plugins: [
     viteSingleFile()
   ],
+  define: {
+    // Required for some libraries that check for Node.js environment
+    'process.env.NODE_ENV': JSON.stringify('production'),
+  },
+  resolve: {
+    alias: {
+      // Polyfill for Node.js buffer if needed
+      buffer: 'buffer',
+    },
+  },
   build: {
     minify: true,
     target: 'esnext',
@@ -17,5 +27,8 @@ export default defineConfig({
         entryFileNames: 'index.js',
       }
     }
-  }
+  },
+  optimizeDeps: {
+    include: ['googlevideo', 'bgutils-js'],
+  },
 })

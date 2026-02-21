@@ -10,10 +10,17 @@ import {
   getPlaylistTracksInnertube,
   getSearchSuggestionsInnertube,
   getTrackFromApiIdInnertube,
-  getTrackUrlInnertube,
   searchPlaylistsInnertube,
   searchTracksInnertube,
 } from "./innertube-api";
+import {
+  onPlay,
+  onPause,
+  onResume,
+  onSeek,
+  onSetVolume,
+  onSetPlaybackRate,
+} from "./sabr-player";
 
 const sendMessage = (message: MessageType) => {
   application.postUiMessage(message);
@@ -169,10 +176,6 @@ async function searchAll(request: SearchRequest): Promise<SearchAllResult> {
   };
 }
 
-async function getTrackUrl(track: GetTrackUrlRequest): Promise<string> {
-  return await getTrackUrlInnertube(track);
-}
-
 export async function canParseUrl(
   url: string,
   type: ParseUrlType
@@ -200,7 +203,6 @@ export async function getSuggestions(request: GetSearchSuggestionsRequest) {
 application.onSearchAll = searchAll;
 application.onSearchTracks = searchTracks;
 application.onSearchPlaylists = searchPlaylists;
-application.onGetTrackUrl = getTrackUrl;
 application.onGetPlaylistTracks = getPlaylistTracks;
 application.onGetTopItems = getTopItems;
 application.onGetTrack = getTrack;
@@ -208,6 +210,14 @@ application.onLookupPlaylistUrl = importPlaylist;
 application.onLookupTrackUrls = resolveTracksUrls;
 application.onCanParseUrl = canParseUrl;
 application.onGetSearchSuggestions = getSuggestions;
+
+// Register embedded player callbacks for SABR streaming
+application.onPlay = onPlay;
+application.onPause = onPause;
+application.onResume = onResume;
+application.onSeek = onSeek;
+application.onSetVolume = onSetVolume;
+application.onSetPlaybackRate = onSetPlaybackRate;
 
 application.onLookupTrack = async (request: LookupTrackRequest) => {
   const search = await searchTracks({
