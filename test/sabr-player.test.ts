@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, test, beforeEach, vi } from "vitest";
 import { mockApplication } from "./mock-application";
 import {
   SabrAudioPlayer,
@@ -43,6 +43,20 @@ vi.mock("../src/innertube-api", () => ({
       deviceMake: "",
       deviceModel: "",
     },
+    manifest: btoa("<MPD></MPD>"),
+  }),
+  reloadPlayerResponse: vi.fn().mockResolvedValue({
+    streamingUrl: "https://example.com/sabr-reloaded",
+    ustreamerConfig: "mock-config-reloaded",
+  }),
+  getInnertube: vi.fn().mockResolvedValue({
+    session: {
+      context: {
+        client: {
+          visitorData: "mock-visitor-data",
+        },
+      },
+    },
   }),
 }));
 
@@ -51,15 +65,85 @@ vi.mock("../src/po-token", () => ({
   getPoToken: vi.fn().mockResolvedValue("mock-po-token"),
 }));
 
-// Mock the googlevideo/sabr-stream module
-vi.mock("googlevideo/sabr-stream", () => ({
-  SabrStream: vi.fn().mockImplementation(() => ({
-    start: vi.fn().mockResolvedValue({
-      audioStream: new ReadableStream(),
-      selectedFormats: {},
-    }),
-    abort: vi.fn(),
+// Mock shaka-player
+const mockShakaPlayer = {
+  attach: vi.fn().mockResolvedValue(undefined),
+  configure: vi.fn(),
+  addEventListener: vi.fn(),
+  load: vi.fn().mockResolvedValue(undefined),
+  destroy: vi.fn().mockResolvedValue(undefined),
+  getMediaElement: vi.fn(),
+  getNetworkingEngine: vi.fn().mockReturnValue(null),
+  getVariantTracks: vi.fn().mockReturnValue([]),
+  getPlaybackRate: vi.fn().mockReturnValue(1),
+  getStats: vi.fn().mockReturnValue({ estimatedBandwidth: 1000000 }),
+  getConfiguration: vi.fn().mockReturnValue({
+    streaming: { retryParameters: {} },
+  }),
+};
+
+vi.mock("shaka-player/dist/shaka-player.ui", () => ({
+  default: {
+    polyfill: {
+      installAll: vi.fn(),
+    },
+    Player: vi.fn().mockImplementation(() => mockShakaPlayer),
+    net: {
+      NetworkingEngine: {
+        RequestType: { SEGMENT: 1 },
+        registerScheme: vi.fn(),
+        unregisterScheme: vi.fn(),
+        PluginPriority: { PREFERRED: 3 },
+        makeRequest: vi.fn(),
+      },
+      HttpFetchPlugin: {
+        isSupported: vi.fn().mockReturnValue(true),
+      },
+    },
+    util: {
+      Error: class ShakaError extends Error {
+        static Severity = { RECOVERABLE: 1, CRITICAL: 2 };
+        static Category = { NETWORK: 1 };
+        static Code = {
+          HTTP_ERROR: 1001,
+          BAD_HTTP_STATUS: 1003,
+          OPERATION_ABORTED: 7001,
+          TIMEOUT: 1003,
+        };
+        severity: number;
+        category: number;
+        code: number;
+        constructor(...args: any[]) {
+          super(String(args[3] || "ShakaError"));
+          this.severity = args[0];
+          this.category = args[1];
+          this.code = args[2];
+        }
+      },
+      AbortableOperation: vi.fn(),
+      Timer: vi.fn().mockImplementation(() => ({
+        tickAfter: vi.fn(),
+        stop: vi.fn(),
+      })),
+      StringUtils: {
+        fromBytesAutoDetect: vi.fn().mockReturnValue(""),
+      },
+    },
+  },
+}));
+
+// Mock googlevideo/sabr-streaming-adapter
+vi.mock("googlevideo/sabr-streaming-adapter", () => ({
+  SabrStreamingAdapter: vi.fn().mockImplementation(() => ({
+    attach: vi.fn(),
+    dispose: vi.fn(),
+    onMintPoToken: vi.fn(),
+    onReloadPlayerResponse: vi.fn(),
+    setStreamingURL: vi.fn(),
+    setUstreamerConfig: vi.fn(),
+    setServerAbrFormats: vi.fn(),
   })),
+  SabrUmpProcessor: vi.fn(),
 }));
 
 // Mock HTMLAudioElement
@@ -106,63 +190,6 @@ class MockAudioElement {
   load() {}
 }
 
-// Mock MediaSource
-class MockMediaSource {
-  readyState = "open";
-  private eventListeners: Record<string, Function[]> = {};
-
-  addEventListener(event: string, callback: Function, options?: any) {
-    if (!this.eventListeners[event]) {
-      this.eventListeners[event] = [];
-    }
-    this.eventListeners[event].push(callback);
-    // Trigger sourceopen immediately for testing
-    if (event === "sourceopen") {
-      setTimeout(() => callback(), 0);
-    }
-  }
-
-  removeEventListener() {}
-
-  addSourceBuffer(_mimeType: string) {
-    return new MockSourceBuffer();
-  }
-
-  endOfStream() {
-    this.readyState = "ended";
-  }
-
-  static isTypeSupported(_mimeType: string) {
-    return true;
-  }
-}
-
-class MockSourceBuffer {
-  updating = false;
-  buffered = { length: 0 };
-  private eventListeners: Record<string, Function[]> = {};
-
-  addEventListener(event: string, callback: Function) {
-    if (!this.eventListeners[event]) {
-      this.eventListeners[event] = [];
-    }
-    this.eventListeners[event].push(callback);
-  }
-
-  appendBuffer(_buffer: Uint8Array) {
-    this.updating = true;
-    setTimeout(() => {
-      this.updating = false;
-      if (this.eventListeners["updateend"]) {
-        this.eventListeners["updateend"].forEach((cb) => cb());
-      }
-    }, 0);
-  }
-
-  abort() {}
-  remove() {}
-}
-
 // Set up global mocks
 beforeEach(() => {
   vi.clearAllMocks();
@@ -184,12 +211,6 @@ beforeEach(() => {
     body: {
       appendChild: vi.fn(),
     },
-  };
-
-  (global as any).MediaSource = MockMediaSource;
-  (global as any).URL = {
-    createObjectURL: vi.fn().mockReturnValue("blob:test"),
-    revokeObjectURL: vi.fn(),
   };
 });
 
@@ -219,13 +240,12 @@ describe("SabrAudioPlayer", () => {
         duration: 180,
       };
 
-      // Start playback using SABR streaming
       await player.playTrack(track);
 
       expect(stateChanges).toContain(PlaybackState.LOADING);
     });
 
-    test("should successfully play track using SABR", async () => {
+    test("should successfully play track using Shaka Player", async () => {
       const player = new SabrAudioPlayer();
 
       const track: Track = {
@@ -380,33 +400,26 @@ describe("callback handlers", () => {
       duration: 180,
     };
 
-    // This will use the mocked legacy fallback
     await onPlay(track);
-    // No assertion needed - just verify it doesn't throw
   });
 
   test("onPause should call player.pause", async () => {
     await onPause();
-    // No assertion needed - just verify it doesn't throw
   });
 
   test("onResume should call player.resume", async () => {
     await onResume();
-    // No assertion needed - just verify it doesn't throw
   });
 
   test("onSeek should call player.seek", async () => {
     await onSeek(60);
-    // No assertion needed - just verify it doesn't throw
   });
 
   test("onSetVolume should call player.setVolume", async () => {
     await onSetVolume(0.5);
-    // No assertion needed - just verify it doesn't throw
   });
 
   test("onSetPlaybackRate should call player.setPlaybackRate", async () => {
     await onSetPlaybackRate(1.5);
-    // No assertion needed - just verify it doesn't throw
   });
 });

@@ -2,7 +2,7 @@
  * Integration tests for SABR streaming.
  * Layered diagnostic tests that isolate each failure point.
  *
- * Tests 1, 2, 5 require network access to YouTube.
+ * Tests 1, 2 require network access to YouTube.
  * Tests 3, 4 are purely local (no network).
  *
  * Run with: npx vitest run test/sabr-integration.test.ts
@@ -91,7 +91,7 @@ describe("SABR Integration", () => {
   test("Fetch wrapper fidelity: URL conversion, body handling, no spoofed origin", async () => {
     const calls: { url: string; init: RequestInit }[] = [];
 
-    // Spy fetch that replicates createYouTubeFetch logic
+    // Spy fetch that replicates createNetworkFetch logic
     const spyFetch = async (
       input: RequestInfo | URL,
       init?: RequestInit
@@ -176,98 +176,5 @@ describe("SABR Integration", () => {
     const copiedArray = new Uint8Array(subarray);
     expect(copiedArray.buffer.byteLength).toBe(6); // Copy is correct
     expect(copiedArray.length).toBe(6);
-
-    // But the original code did: new Uint8Array(init.body).buffer
-    // which copies first then takes .buffer - this is actually correct but wasteful.
-    // The simpler fix (Blob([subarray])) avoids the copy entirely.
   });
-
-  test(
-    "Full SABR streaming: no 403, yields audio chunks",
-    async () => {
-      // Skip in JSDOM - streaming requires Node.js native fetch with proper ReadableStream support
-      if (typeof window !== "undefined" && typeof window.document !== "undefined") {
-        console.log("Skipping full SABR test in JSDOM environment");
-        return;
-      }
-
-      const { SabrStream } = await import("googlevideo/sabr-stream");
-      const { convertToSabrFormat } = await import("../src/sabr-config");
-
-      // Step 1: Get SABR info
-      const info = await youtube.getInfo(VIDEO_ID, { client: "WEB" });
-      const streamingData = info.streaming_data;
-      expect(streamingData).toBeDefined();
-
-      const serverAbrStreamingUrl = (streamingData as any)
-        .server_abr_streaming_url;
-      expect(serverAbrStreamingUrl).toBeDefined();
-
-      const ustreamerConfig =
-        (info as any).player_config?.media_common_config
-          ?.media_ustreamer_request_config?.video_playback_ustreamer_config;
-      expect(ustreamerConfig).toBeDefined();
-
-      const visitorData = youtube.session?.context?.client?.visitorData ?? "";
-      expect(visitorData.length).toBeGreaterThan(0);
-
-      // Step 2: Generate PO token (truncate identifier to 118-byte limit)
-      const MAX_IDENTIFIER_BYTES = 118;
-      const encoder = new TextEncoder();
-      let identifier = visitorData;
-      while (encoder.encode(identifier).length > MAX_IDENTIFIER_BYTES) {
-        identifier = identifier.slice(0, -1);
-      }
-      const poToken = BG.PoToken.generateColdStartToken(identifier, 1);
-      expect(poToken.length).toBeGreaterThan(0);
-
-      // Step 3: Convert all adaptive formats (SabrStream needs both video + audio)
-      const adaptiveFormats = streamingData!.adaptive_formats ?? [];
-      expect(adaptiveFormats.length).toBeGreaterThan(0);
-
-      const formats = adaptiveFormats.map((f: any) => convertToSabrFormat(f));
-
-      // Step 4: Get client info
-      const sessionClient = youtube.session?.context?.client;
-      const clientInfo = {
-        clientName: 1,
-        clientVersion: sessionClient?.clientVersion ?? "",
-        osName: sessionClient?.osName ?? "",
-        osVersion: sessionClient?.osVersion ?? "",
-        deviceMake: sessionClient?.deviceMake ?? "",
-        deviceModel: sessionClient?.deviceModel ?? "",
-      };
-
-      // Step 5: Create SabrStream with native fetch (no wrapper needed for this test)
-      const sabrStream = new SabrStream({
-        fetch: globalThis.fetch,
-        serverAbrStreamingUrl,
-        videoPlaybackUstreamerConfig: ustreamerConfig,
-        clientInfo,
-        poToken,
-        durationMs: 0,
-        formats,
-      });
-
-      // Step 6: Start streaming - should not throw 403
-      const result = await sabrStream.start({
-        enabledTrackTypes: 1,
-      });
-
-      expect(result.audioStream).toBeDefined();
-
-      // Step 7: Read at least one chunk
-      const reader = result.audioStream.getReader();
-      const { done, value } = await reader.read();
-
-      expect(done).toBe(false);
-      expect(value).toBeDefined();
-      expect(value!.length).toBeGreaterThan(0);
-
-      // Clean up
-      reader.cancel();
-      sabrStream.abort();
-    },
-    { timeout: 30000 }
-  );
 });

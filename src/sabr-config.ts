@@ -33,6 +33,8 @@ export interface SabrInfo {
   durationMs: number;
   visitorData: string;
   clientInfo: SabrClientInfo;
+  /** Base64-encoded DASH XML manifest for Shaka Player */
+  manifest: string;
 }
 
 /**
@@ -110,116 +112,3 @@ export const selectBestAudioFormat = (
   return sorted[0];
 };
 
-/**
- * Convert FormatStream from youtubei.js to SabrFormat
- */
-export const convertToSabrFormat = (format: {
-  itag: number;
-  last_modified_ms?: string;
-  lastModified?: string;
-  xtags?: string;
-  width?: number;
-  height?: number;
-  mime_type?: string;
-  mimeType?: string;
-  audio_quality?: string;
-  audioQuality?: string;
-  bitrate?: number;
-  average_bitrate?: number;
-  averageBitrate?: number;
-  quality?: string;
-  quality_label?: string;
-  qualityLabel?: string;
-  audio_track?: { id: string };
-  audioTrackId?: string;
-  is_drc?: boolean;
-  isDrc?: boolean;
-  approx_duration_ms?: number;
-  approxDurationMs?: string | number;
-  content_length?: number;
-  contentLength?: string | number;
-  is_auto_dubbed?: boolean;
-  is_descriptive?: boolean;
-  is_dubbed?: boolean;
-  language?: string | null;
-  is_original?: boolean;
-  is_secondary?: boolean;
-}): SabrFormat => {
-  return {
-    itag: format.itag,
-    lastModified: format.lastModified ?? format.last_modified_ms ?? "",
-    xtags: format.xtags,
-    width: format.width,
-    height: format.height,
-    mimeType: format.mimeType ?? format.mime_type,
-    audioQuality: format.audioQuality ?? format.audio_quality,
-    bitrate: format.bitrate ?? 0,
-    averageBitrate: format.averageBitrate ?? format.average_bitrate,
-    quality: format.quality,
-    qualityLabel: format.qualityLabel ?? format.quality_label,
-    audioTrackId: format.audioTrackId ?? format.audio_track?.id,
-    isDrc: format.isDrc ?? format.is_drc,
-    approxDurationMs: parseApproxDuration(format),
-    contentLength: parseContentLength(format),
-    isAutoDubbed: format.is_auto_dubbed,
-    isDescriptive: format.is_descriptive,
-    isDubbed: format.is_dubbed,
-    language: format.language,
-    isOriginal: format.is_original,
-    isSecondary: format.is_secondary,
-  };
-};
-
-const parseApproxDuration = (format: {
-  approx_duration_ms?: number;
-  approxDurationMs?: string | number;
-}): number => {
-  if (typeof format.approxDurationMs === "number") {
-    return format.approxDurationMs;
-  }
-  if (typeof format.approxDurationMs === "string") {
-    return parseInt(format.approxDurationMs, 10) || 0;
-  }
-  return format.approx_duration_ms ?? 0;
-};
-
-const parseContentLength = (format: {
-  content_length?: number;
-  contentLength?: string | number;
-}): number | undefined => {
-  if (typeof format.contentLength === "number") {
-    return format.contentLength;
-  }
-  if (typeof format.contentLength === "string") {
-    return parseInt(format.contentLength, 10) || undefined;
-  }
-  return format.content_length;
-};
-
-/**
- * Create an audio format selector function for SabrStream
- */
-export const createAudioFormatSelector = (
-  preferOpus: boolean = true
-): ((formats: SabrFormat[]) => SabrFormat | undefined) => {
-  return (formats: SabrFormat[]) => {
-    const audioFormats = filterAudioFormats(formats);
-
-    if (audioFormats.length === 0) {
-      return undefined;
-    }
-
-    const sorted = sortAudioFormats(audioFormats);
-
-    if (preferOpus) {
-      // Find best Opus format first
-      const opusFormat = sorted.find((f) => parseCodec(f.mimeType) === "opus");
-      if (opusFormat) {
-        return opusFormat;
-      }
-    }
-
-    // Fall back to best available format
-    return sorted[0];
-  };
-};

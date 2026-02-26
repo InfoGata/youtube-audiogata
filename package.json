@@ -14,6 +14,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "googlevideo": "^4.0.4",
+    "shaka-player": "^4.16.2",
     "iso8601-duration": "^1.3.0",
     "ky": "^1.7.5",
     "lucide-react": "^0.400.0",
@@ -26,6 +27,8 @@
     "build": "tsc && npm run build:options && npm run build:plugin",
     "build:options": "vite build --config vite.config.ts",
     "build:plugin": "vite build --config plugin.vite.config.ts",
+    "patch:shaka": "node ./scripts/patchShaka.mjs",
+    "postinstall": "npm run patch:shaka",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },

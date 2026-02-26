@@ -1,31 +1,26 @@
 /**
  * SABR Audio Player for YouTube audio streaming.
- * Uses the googlevideo library with MediaSource Extensions for audio playback.
+ * Uses Shaka Player + SabrStreamingAdapter for segment-based streaming
+ * with native seeking support.
  */
 
-import { SabrStream } from "googlevideo/sabr-stream";
-import type { FetchFunction } from "googlevideo/shared-types";
-import type { ClientInfo } from "googlevideo/protos";
-import { getSabrInfoInnertube } from "./innertube-api";
+import shaka from "shaka-player/dist/shaka-player.ui";
+import { SabrStreamingAdapter } from "googlevideo/sabr-streaming-adapter";
+import { ShakaPlayerAdapter } from "./ShakaPlayerAdapter";
+import { getSabrInfoInnertube, reloadPlayerResponse, getInnertube } from "./innertube-api";
 import { getPoToken } from "./po-token";
-import { selectBestAudioFormat, type SabrInfo } from "./sabr-config";
 
 /**
- * Create a wrapped fetch function that adds YouTube-specific headers
- * and properly handles binary data for AudioGata's network request.
+ * Create a fetch function that routes through application.networkRequest
+ * and handles binary body data properly for the AudioGata sandbox.
  */
-const createYouTubeFetch = (): FetchFunction => {
+const createNetworkFetch = (): typeof fetch => {
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const headers = new Headers(init?.headers);
-
-    // Do NOT set origin/referer to youtube.com — the browser automatically adds
-    // sec-fetch-site: none (because AudioGata runs in a sandbox), which contradicts
-    // a spoofed origin. Leaving these out keeps headers consistent and avoids 403.
 
     // Handle binary body data - convert Uint8Array to Blob for proper transmission
     let body: BodyInit | null | undefined = init?.body;
     if (init?.body instanceof Uint8Array) {
-      // Slice to get a properly-sized ArrayBuffer (handles subarray views correctly)
       const buf = init.body;
       const arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
       body = new Blob([arrayBuffer], { type: "application/x-protobuf" });
@@ -39,8 +34,7 @@ const createYouTubeFetch = (): FetchFunction => {
       body,
     };
 
-    // Use the application's network request function
-    // SabrStream may pass a URL object; convert to string for networkRequest
+    // SabrStream / Shaka may pass URL objects; convert to string for networkRequest
     const urlStr = input instanceof URL ? input.toString() : input;
     return application.networkRequest(urlStr as RequestInfo, modifiedInit);
   };
@@ -70,22 +64,17 @@ export interface SabrPlayerCallbacks {
 
 /**
  * SABR Audio Player class
- * Manages SABR streaming and audio playback using MediaSource Extensions
+ * Uses Shaka Player with SabrStreamingAdapter for segment-based audio streaming.
+ * Shaka handles seeking by requesting the correct segment automatically.
  */
 export class SabrAudioPlayer {
   private audio: HTMLAudioElement | null = null;
-  private mediaSource: MediaSource | null = null;
-  private sourceBuffer: SourceBuffer | null = null;
-  private sabrStream: SabrStream | null = null;
-  private audioStreamReader: ReadableStreamDefaultReader<Uint8Array> | null =
-    null;
+  private player: shaka.Player | null = null;
+  private sabrAdapter: SabrStreamingAdapter | null = null;
+  private shakaPlayerAdapter: ShakaPlayerAdapter | null = null;
   private currentTrack: Track | null = null;
   private state: PlaybackState = PlaybackState.IDLE;
   private callbacks: SabrPlayerCallbacks = {};
-  private pendingChunks: Uint8Array[] = [];
-  private isAppending: boolean = false;
-  private streamEnded: boolean = false;
-  private initSegmentReceived: boolean = false;
 
   constructor(callbacks: SabrPlayerCallbacks = {}) {
     this.callbacks = callbacks;
@@ -113,7 +102,7 @@ export class SabrAudioPlayer {
   }
 
   /**
-   * Play a track using SABR streaming
+   * Play a track using SABR streaming via Shaka Player
    */
   async playTrack(track: Track): Promise<boolean> {
     // Stop any current playback
@@ -123,10 +112,7 @@ export class SabrAudioPlayer {
     this.setState(PlaybackState.LOADING);
 
     try {
-      const success = await this.initSabrPlayback(track);
-      if (!success) {
-        throw new Error("SABR streaming not available for this track");
-      }
+      await this.initShakaPlayback(track);
       return true;
     } catch (error) {
       console.error("Playback error:", error);
@@ -139,88 +125,23 @@ export class SabrAudioPlayer {
   }
 
   /**
-   * Initialize SABR playback
+   * Initialize Shaka Player with SabrStreamingAdapter
    */
-  private async initSabrPlayback(track: Track): Promise<boolean> {
+  private async initShakaPlayback(track: Track): Promise<void> {
     if (!track.apiId) {
-      console.error("Track does not have a valid API ID");
-      return false;
+      throw new Error("Track does not have a valid API ID");
     }
 
-    // Get SABR info from Innertube
+    // Get SABR info from Innertube (includes DASH manifest)
     const sabrInfo = await getSabrInfoInnertube(track.apiId);
     if (!sabrInfo) {
-      console.error("Failed to retrieve SABR info for track:", track.apiId);
-      return false;
+      throw new Error("Failed to retrieve SABR info for track: " + track.apiId);
     }
 
-    // Get PO token for SABR streaming
-    let poToken: string | undefined;
-    try {
-      if (sabrInfo.visitorData) {
-        console.log("SABR: Getting PO token with visitor data:", sabrInfo.visitorData.substring(0, 20) + "...");
-        // Use cold start token which is more reliable in sandboxed environments
-        poToken = await getPoToken(sabrInfo.visitorData, true);
-        console.log("SABR: Got PO token:", poToken ? poToken.substring(0, 20) + "..." : "null");
-      }
-    } catch (error) {
-      console.warn("SABR: Failed to generate PO token, continuing without it:", error);
-    }
+    // Install Shaka polyfills
+    shaka.polyfill.installAll();
 
-    // Use client info from the Innertube session
-    const clientInfo: ClientInfo = {
-      clientName: sabrInfo.clientInfo.clientName,
-      clientVersion: sabrInfo.clientInfo.clientVersion,
-      osName: sabrInfo.clientInfo.osName,
-      osVersion: sabrInfo.clientInfo.osVersion,
-      deviceMake: sabrInfo.clientInfo.deviceMake,
-      deviceModel: sabrInfo.clientInfo.deviceModel,
-    };
-
-    console.log("SABR: Using client info:", clientInfo);
-    console.log("SABR: Streaming URL:", sabrInfo.serverAbrStreamingUrl.substring(0, 100) + "...");
-    console.log("SABR: Ustreamer config length:", sabrInfo.ustreamerConfig?.length);
-    console.log("SABR: Formats count:", sabrInfo.formats?.length);
-
-    // Create wrapped fetch function with YouTube headers
-    const youtubeFetch = createYouTubeFetch();
-
-    // Create SABR stream
-    this.sabrStream = new SabrStream({
-      fetch: youtubeFetch,
-      serverAbrStreamingUrl: sabrInfo.serverAbrStreamingUrl,
-      videoPlaybackUstreamerConfig: sabrInfo.ustreamerConfig,
-      clientInfo,
-      poToken,
-      durationMs: sabrInfo.durationMs,
-      formats: sabrInfo.formats,
-    });
-
-    // Set up audio element and MediaSource
-    this.setupAudioElement();
-    await this.setupMediaSource(sabrInfo);
-
-    // Start streaming
-    const result = await this.sabrStream.start({
-      enabledTrackTypes: 1, // Audio only
-      preferOpus: true,
-    });
-
-    // Start consuming the audio stream
-    this.audioStreamReader = result.audioStream.getReader();
-    this.consumeAudioStream();
-
-    // Start playback
-    await this.audio!.play();
-    this.setState(PlaybackState.PLAYING);
-
-    return true;
-  }
-
-  /**
-   * Set up the audio element
-   */
-  private setupAudioElement(): void {
+    // Create audio element
     this.audio = document.createElement("audio");
     this.audio.crossOrigin = "anonymous";
 
@@ -230,8 +151,6 @@ export class SabrAudioPlayer {
         const currentTime = this.audio.currentTime;
         const duration = this.audio.duration || 0;
         this.callbacks.onTimeUpdate?.(currentTime, duration);
-
-        // Report to AudioGata application
         application.setTrackTime(currentTime);
       }
     });
@@ -249,207 +168,88 @@ export class SabrAudioPlayer {
       this.setState(PlaybackState.ERROR);
       this.callbacks.onError?.(new Error("Audio playback error"));
     });
-  }
 
-  /**
-   * Set up MediaSource for SABR streaming
-   */
-  private async setupMediaSource(sabrInfo: SabrInfo): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.mediaSource = new MediaSource();
-      this.audio!.src = URL.createObjectURL(this.mediaSource);
+    // Create Shaka Player and attach to audio element
+    this.player = new shaka.Player();
+    await this.player.attach(this.audio);
 
-      this.mediaSource.addEventListener(
-        "sourceopen",
-        () => {
-          try {
-            // Select best audio format for MIME type
-            const audioFormat = selectBestAudioFormat(sabrInfo.formats);
-            const mimeType = audioFormat?.mimeType || "audio/webm; codecs=opus";
-
-            // Check if the MIME type is supported
-            if (!MediaSource.isTypeSupported(mimeType)) {
-              // Try a fallback MIME type
-              const fallbackMime = "audio/webm; codecs=opus";
-              if (MediaSource.isTypeSupported(fallbackMime)) {
-                this.sourceBuffer =
-                  this.mediaSource!.addSourceBuffer(fallbackMime);
-              } else {
-                throw new Error(`No supported MIME type found`);
-              }
-            } else {
-              this.sourceBuffer = this.mediaSource!.addSourceBuffer(mimeType);
-            }
-
-            // Handle source buffer events
-            this.sourceBuffer.addEventListener("updateend", () => {
-              this.isAppending = false;
-              this.processPendingChunks();
-            });
-
-            this.sourceBuffer.addEventListener("error", (e) => {
-              console.error("SourceBuffer error:", e);
-            });
-
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
-        },
-        { once: true }
-      );
-
-      this.mediaSource.addEventListener(
-        "sourceclose",
-        () => {
-          console.log("MediaSource closed");
-        },
-        { once: true }
-      );
-
-      this.mediaSource.addEventListener(
-        "error",
-        () => {
-          reject(new Error("MediaSource error"));
-        },
-        { once: true }
-      );
+    // Configure Shaka for audio streaming
+    this.player.configure({
+      abr: {
+        enabled: true,
+      },
+      streaming: {
+        bufferingGoal: 120,
+        rebufferingGoal: 2,
+      },
     });
-  }
 
-  /**
-   * Consume the audio stream from SabrStream
-   */
-  private async consumeAudioStream(): Promise<void> {
-    if (!this.audioStreamReader) {
-      return;
-    }
+    // Do NOT register a global "error" event listener on the Shaka Player.
+    // SABR streaming produces RECOVERABLE errors during normal operation
+    // (e.g., redirects, context updates). Shaka handles these internally
+    // via retries. Treating them as fatal kills playback on seek.
 
-    try {
-      while (true) {
-        const { done, value } = await this.audioStreamReader.read();
+    // Create ShakaPlayerAdapter and set fetch function
+    this.shakaPlayerAdapter = new ShakaPlayerAdapter();
+    this.shakaPlayerAdapter.setFetchFunction(createNetworkFetch());
 
-        if (done) {
-          this.streamEnded = true;
-          this.finalizeStream();
-          break;
-        }
+    // Build client info for SABR adapter
+    const clientInfo = {
+      clientName: sabrInfo.clientInfo.clientName,
+      clientVersion: sabrInfo.clientInfo.clientVersion,
+      osName: sabrInfo.clientInfo.osName,
+      osVersion: sabrInfo.clientInfo.osVersion,
+      deviceMake: sabrInfo.clientInfo.deviceMake,
+      deviceModel: sabrInfo.clientInfo.deviceModel,
+    };
 
-        if (value) {
-          this.appendChunk(value);
-        }
-      }
-    } catch (error) {
-      console.error("Error consuming audio stream:", error);
-      // Don't treat stream abort as an error
-      if (
-        error instanceof Error &&
-        error.message.includes("abort") === false
-      ) {
-        this.callbacks.onError?.(error);
-      }
-    }
-  }
+    // Create SabrStreamingAdapter
+    this.sabrAdapter = new SabrStreamingAdapter({
+      playerAdapter: this.shakaPlayerAdapter,
+      clientInfo,
+    });
 
-  /**
-   * Append a chunk to the source buffer
-   */
-  private appendChunk(chunk: Uint8Array): void {
-    if (!this.sourceBuffer) {
-      return;
-    }
-
-    this.pendingChunks.push(chunk);
-    this.processPendingChunks();
-  }
-
-  /**
-   * Process pending chunks
-   */
-  private processPendingChunks(): void {
-    if (
-      this.isAppending ||
-      !this.sourceBuffer ||
-      this.pendingChunks.length === 0
-    ) {
-      return;
-    }
-
-    if (this.sourceBuffer.updating) {
-      return;
-    }
-
-    const chunk = this.pendingChunks.shift();
-    if (!chunk) {
-      return;
-    }
-
-    try {
-      this.isAppending = true;
-      // Create a new Uint8Array from the chunk to ensure it has a proper ArrayBuffer
-      // This is needed because the chunk might have a SharedArrayBuffer which isn't accepted
-      const buffer = new Uint8Array(chunk).buffer;
-      this.sourceBuffer.appendBuffer(buffer);
-      if (!this.initSegmentReceived) {
-        this.initSegmentReceived = true;
-      }
-    } catch (error) {
-      this.isAppending = false;
-      console.error("Error appending buffer:", error);
-
-      // If QuotaExceededError, try to remove old data
-      if (error instanceof DOMException && error.name === "QuotaExceededError") {
-        this.removeOldBufferedData();
-        // Re-add chunk to pending
-        this.pendingChunks.unshift(chunk);
-      }
-    }
-  }
-
-  /**
-   * Remove old buffered data to make room for new data
-   */
-  private removeOldBufferedData(): void {
-    if (
-      !this.sourceBuffer ||
-      !this.audio ||
-      this.sourceBuffer.updating ||
-      this.sourceBuffer.buffered.length === 0
-    ) {
-      return;
-    }
-
-    const currentTime = this.audio.currentTime;
-    const removeEnd = Math.max(0, currentTime - 30); // Keep 30 seconds behind
-
-    if (removeEnd > 0) {
+    // Register PO token callback — called with no args, returns PO token string
+    this.sabrAdapter.onMintPoToken(async () => {
       try {
-        this.sourceBuffer.remove(0, removeEnd);
+        const youtube = await getInnertube();
+        const visitorData = youtube.session?.context?.client?.visitorData ?? "";
+        return await getPoToken(visitorData, true);
       } catch (error) {
-        console.error("Error removing buffered data:", error);
+        console.warn("Failed to mint PO token:", error);
+        return "";
       }
-    }
-  }
+    });
 
-  /**
-   * Finalize the stream when all data has been received
-   */
-  private finalizeStream(): void {
-    if (!this.mediaSource || this.mediaSource.readyState !== "open") {
-      return;
-    }
+    // Register reload player response callback
+    // Called with reloadPlaybackContext, must update adapter state and resolve
+    const sabrAdapter = this.sabrAdapter;
+    const videoId = track.apiId!;
+    this.sabrAdapter.onReloadPlayerResponse(async (reloadContext) => {
+      console.log("Requesting player response reload...");
+      const result = await reloadPlayerResponse(videoId, reloadContext);
+      sabrAdapter.setStreamingURL(result.streamingUrl);
+      if (result.ustreamerConfig) {
+        sabrAdapter.setUstreamerConfig(result.ustreamerConfig);
+      }
+    });
 
-    // Wait for pending chunks to be appended
-    if (this.pendingChunks.length > 0 || this.isAppending) {
-      setTimeout(() => this.finalizeStream(), 100);
-      return;
-    }
+    // Attach SABR adapter to Shaka Player
+    this.sabrAdapter.attach(this.player);
 
-    try {
-      this.mediaSource.endOfStream();
-    } catch (error) {
-      console.error("Error ending stream:", error);
-    }
+    // Set streaming URL, ustreamer config, and formats
+    this.sabrAdapter.setStreamingURL(sabrInfo.serverAbrStreamingUrl);
+    this.sabrAdapter.setUstreamerConfig(sabrInfo.ustreamerConfig);
+    this.sabrAdapter.setServerAbrFormats(sabrInfo.formats);
+
+    // Load the DASH manifest
+    await this.player.load(
+      `data:application/dash+xml;base64,${sabrInfo.manifest}`
+    );
+
+    // Start playback
+    await this.audio.play();
+    this.setState(PlaybackState.PLAYING);
   }
 
   /**
@@ -473,7 +273,8 @@ export class SabrAudioPlayer {
   }
 
   /**
-   * Seek to a specific time
+   * Seek to a specific time.
+   * Shaka Player handles segment requests for the target time automatically.
    */
   seek(time: number): void {
     if (this.audio) {
@@ -500,38 +301,27 @@ export class SabrAudioPlayer {
   }
 
   /**
-   * Stop playback and clean up resources
+   * Stop playback and clean up all resources
    */
   stop(): void {
-    // Abort SABR stream
-    if (this.sabrStream) {
-      this.sabrStream.abort();
-      this.sabrStream = null;
+    // Dispose SABR adapter
+    if (this.sabrAdapter) {
+      this.sabrAdapter.dispose();
+      this.sabrAdapter = null;
     }
 
-    // Cancel stream reader
-    if (this.audioStreamReader) {
-      this.audioStreamReader.cancel().catch(() => {});
-      this.audioStreamReader = null;
+    // Dispose Shaka player adapter
+    if (this.shakaPlayerAdapter) {
+      this.shakaPlayerAdapter.dispose();
+      this.shakaPlayerAdapter = null;
     }
 
-    // Clean up media source
-    if (this.sourceBuffer) {
-      try {
-        if (this.mediaSource?.readyState === "open") {
-          this.sourceBuffer.abort();
-        }
-      } catch {
-        // Ignore errors during cleanup
-      }
-      this.sourceBuffer = null;
-    }
-
-    if (this.mediaSource) {
-      if (this.audio?.src) {
-        URL.revokeObjectURL(this.audio.src);
-      }
-      this.mediaSource = null;
+    // Destroy Shaka player
+    if (this.player) {
+      this.player.destroy().catch((err) => {
+        console.error("Error destroying Shaka player:", err);
+      });
+      this.player = null;
     }
 
     // Clean up audio element
@@ -543,10 +333,6 @@ export class SabrAudioPlayer {
     }
 
     // Reset state
-    this.pendingChunks = [];
-    this.isAppending = false;
-    this.streamEnded = false;
-    this.initSegmentReceived = false;
     this.currentTrack = null;
     this.setState(PlaybackState.IDLE);
   }

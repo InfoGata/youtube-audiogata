@@ -7,8 +7,6 @@ import {
   filterAudioFormats,
   sortAudioFormats,
   selectBestAudioFormat,
-  convertToSabrFormat,
-  createAudioFormatSelector,
 } from "../src/sabr-config";
 
 const createMockAudioFormat = (
@@ -180,97 +178,6 @@ describe("sabr-config", () => {
     test("should return undefined for only video formats", () => {
       const formats = [createMockVideoFormat()];
       expect(selectBestAudioFormat(formats)).toBeUndefined();
-    });
-  });
-
-  describe("convertToSabrFormat", () => {
-    test("should convert youtubei.js format to SabrFormat", () => {
-      const input = {
-        itag: 140,
-        last_modified_ms: "1234567890",
-        mime_type: 'audio/mp4; codecs="mp4a.40.2"',
-        audio_quality: "AUDIO_QUALITY_MEDIUM",
-        bitrate: 128000,
-        average_bitrate: 127000,
-        approx_duration_ms: 180000,
-        content_length: 2880000,
-      };
-
-      const result = convertToSabrFormat(input);
-
-      expect(result.itag).toBe(140);
-      expect(result.lastModified).toBe("1234567890");
-      expect(result.mimeType).toBe('audio/mp4; codecs="mp4a.40.2"');
-      expect(result.audioQuality).toBe("AUDIO_QUALITY_MEDIUM");
-      expect(result.bitrate).toBe(128000);
-      expect(result.averageBitrate).toBe(127000);
-      expect(result.approxDurationMs).toBe(180000);
-      expect(result.contentLength).toBe(2880000);
-    });
-
-    test("should handle camelCase properties", () => {
-      const input = {
-        itag: 251,
-        lastModified: "9876543210",
-        mimeType: 'audio/webm; codecs="opus"',
-        audioQuality: "AUDIO_QUALITY_HIGH",
-        bitrate: 160000,
-        averageBitrate: 155000,
-        approxDurationMs: "240000",
-        contentLength: "4800000",
-      };
-
-      const result = convertToSabrFormat(input);
-
-      expect(result.itag).toBe(251);
-      expect(result.lastModified).toBe("9876543210");
-      expect(result.approxDurationMs).toBe(240000);
-      expect(result.contentLength).toBe(4800000);
-    });
-  });
-
-  describe("createAudioFormatSelector", () => {
-    test("should prefer opus when preferOpus is true", () => {
-      const selector = createAudioFormatSelector(true);
-      const formats = [
-        createMockAudioFormat({
-          itag: 140,
-          mimeType: 'audio/mp4; codecs="mp4a.40.2"',
-          bitrate: 256000,
-        }),
-        createMockAudioFormat({
-          itag: 251,
-          mimeType: 'audio/webm; codecs="opus"',
-          bitrate: 128000,
-        }),
-      ];
-
-      const selected = selector(formats);
-      expect(selected?.itag).toBe(251);
-    });
-
-    test("should select best format when no opus available", () => {
-      const selector = createAudioFormatSelector(true);
-      const formats = [
-        createMockAudioFormat({
-          itag: 140,
-          mimeType: 'audio/mp4; codecs="mp4a.40.2"',
-          bitrate: 128000,
-        }),
-        createMockAudioFormat({
-          itag: 141,
-          mimeType: 'audio/mp4; codecs="mp4a.40.2"',
-          bitrate: 256000,
-        }),
-      ];
-
-      const selected = selector(formats);
-      expect(selected?.itag).toBe(141); // Higher bitrate
-    });
-
-    test("should return undefined for empty formats", () => {
-      const selector = createAudioFormatSelector();
-      expect(selector([])).toBeUndefined();
     });
   });
 });

@@ -29,6 +29,6 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['googlevideo', 'bgutils-js'],
+    include: ['googlevideo', 'bgutils-js', 'shaka-player'],
   },
 })
