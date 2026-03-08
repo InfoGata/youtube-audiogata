@@ -87,7 +87,7 @@ vi.mock("shaka-player/dist/shaka-player.ui", () => ({
     polyfill: {
       installAll: vi.fn(),
     },
-    Player: vi.fn().mockImplementation(() => mockShakaPlayer),
+    Player: vi.fn().mockImplementation(function () { return mockShakaPlayer; }),
     net: {
       NetworkingEngine: {
         RequestType: { SEGMENT: 1 },
@@ -134,15 +134,17 @@ vi.mock("shaka-player/dist/shaka-player.ui", () => ({
 
 // Mock googlevideo/sabr-streaming-adapter
 vi.mock("googlevideo/sabr-streaming-adapter", () => ({
-  SabrStreamingAdapter: vi.fn().mockImplementation(() => ({
-    attach: vi.fn(),
-    dispose: vi.fn(),
-    onMintPoToken: vi.fn(),
-    onReloadPlayerResponse: vi.fn(),
-    setStreamingURL: vi.fn(),
-    setUstreamerConfig: vi.fn(),
-    setServerAbrFormats: vi.fn(),
-  })),
+  SabrStreamingAdapter: vi.fn().mockImplementation(function () {
+    return {
+      attach: vi.fn(),
+      dispose: vi.fn(),
+      onMintPoToken: vi.fn(),
+      onReloadPlayerResponse: vi.fn(),
+      setStreamingURL: vi.fn(),
+      setUstreamerConfig: vi.fn(),
+      setServerAbrFormats: vi.fn(),
+    };
+  }),
   SabrUmpProcessor: vi.fn(),
 }));
 

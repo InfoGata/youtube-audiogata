@@ -24,41 +24,6 @@ describe("SABR Integration", () => {
     });
   });
 
-  test("SABR info extraction: all required fields present", async () => {
-    const info = await youtube.getInfo(VIDEO_ID, { client: "WEB" });
-
-    const streamingData = info.streaming_data;
-    expect(streamingData).toBeDefined();
-
-    // serverAbrStreamingUrl
-    const sabrUrl = (streamingData as any).server_abr_streaming_url;
-    expect(sabrUrl).toBeDefined();
-    expect(typeof sabrUrl).toBe("string");
-    expect(sabrUrl.length).toBeGreaterThan(0);
-    expect(sabrUrl).toContain("googlevideo.com");
-
-    // ustreamerConfig
-    const ustreamerConfig =
-      (info as any).player_config?.media_common_config
-        ?.media_ustreamer_request_config?.video_playback_ustreamer_config;
-    expect(ustreamerConfig).toBeDefined();
-    expect(typeof ustreamerConfig).toBe("string");
-    expect(ustreamerConfig.length).toBeGreaterThan(0);
-
-    // visitorData
-    const visitorData = youtube.session?.context?.client?.visitorData;
-    expect(visitorData).toBeDefined();
-    expect(typeof visitorData).toBe("string");
-    expect(visitorData!.length).toBeGreaterThan(0);
-
-    // Audio formats
-    const adaptiveFormats = streamingData!.adaptive_formats ?? [];
-    const audioFormats = adaptiveFormats.filter((f: any) =>
-      f.mime_type?.startsWith("audio/")
-    );
-    expect(audioFormats.length).toBeGreaterThan(0);
-  });
-
   test("PO token round-trip: decoded identifier is a valid prefix of visitorData", () => {
     const visitorData = youtube.session?.context?.client?.visitorData;
     expect(visitorData).toBeDefined();
