@@ -23,7 +23,7 @@
       "react/jsx-runtime": ["./node_modules/preact/jsx-runtime"],
       "~/*": ["./src/*"]
     },
-    "types": ["@infogata/audiogata-plugin-typings"]
+    "types": ["@infogata/audiogata-plugin-typings", "@types/google-apps-script"]
   },
   "include": [
     "src/**/*",
