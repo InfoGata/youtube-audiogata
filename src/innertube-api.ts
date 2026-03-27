@@ -45,6 +45,9 @@ const getInnertubeInstance = async (): Promise<Innertube> => {
     instance = await Innertube.create({
       fetch: application.networkRequest,
       cookie: "CONSENT=YES+",
+      // Use an older player ID to work around decipher extraction failures
+      // with the latest YouTube player. See: https://github.com/LuanRT/YouTube.js/issues/1146
+      player_id: "251ca12e",
     });
   }
   return instance;
