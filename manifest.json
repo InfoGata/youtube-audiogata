@@ -1,5 +1,6 @@
 {
   "id": "5WWSzBORLfZgym533u87I",
+  "alias": "youtube",
   "name": "Plugin for Youtube",
   "version": "1.16.0",
   "script": "dist/index.js",
