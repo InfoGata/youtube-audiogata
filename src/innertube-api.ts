@@ -17,6 +17,47 @@ const getDurationSeconds = (duration: any): number => {
   return 0;
 };
 
+// Newer YouTube responses return playlists and playlist entries as
+// LockupView nodes instead of Playlist/PlaylistVideo.
+const getLockupThumbnail = (lockup: LockupView) => {
+  const image = lockup.content_image;
+  if (image?.is(YTNodes.CollectionThumbnailView)) {
+    return image.primary_thumbnail;
+  }
+  return image?.as(YTNodes.ThumbnailView) ?? null;
+};
+
+const getLockupImages = (lockup: LockupView): ImageInfo[] =>
+  (getLockupThumbnail(lockup)?.image ?? []).map((t) => ({ url: t.url }));
+
+// Lockups only carry duration as a thumbnail badge like "5:21" or "1:02:03".
+const getLockupDurationSeconds = (lockup: LockupView): number => {
+  const badges =
+    getLockupThumbnail(lockup)
+      ?.overlays.filterType(
+        YTNodes.ThumbnailOverlayBadgeView,
+        YTNodes.ThumbnailBottomOverlayView
+      )
+      .reduce<YTNodes.ThumbnailBadgeView[]>(
+        (all, o) => all.concat(o.badges),
+        []
+      ) ?? [];
+  const text = badges.find((b) => /^\d+(:\d+)+$/.test(b.text))?.text;
+  if (!text) return 0;
+  return text
+    .split(":")
+    .reduce((total, part) => total * 60 + Number(part), 0);
+};
+
+const lockupToTrack = (lockup: LockupView): Track => ({
+  apiId: lockup.content_id,
+  name: lockup.metadata?.title.toString() ?? "",
+  duration: getLockupDurationSeconds(lockup),
+  images: getLockupImages(lockup),
+});
+
+const isDefined = <T>(value: T | null): value is T => value !== null;
+
 // Provide a JavaScript evaluator so youtubei.js can decipher streaming URLs.
 // Without this, decipher() throws "must provide your own JavaScript evaluator".
 Platform.shim.eval = async (
@@ -45,9 +86,6 @@ const getInnertubeInstance = async (): Promise<Innertube> => {
     instance = await Innertube.create({
       fetch: application.networkRequest,
       cookie: "CONSENT=YES+",
-      // Use an older player ID to work around decipher extraction failures
-      // with the latest YouTube player. See: https://github.com/LuanRT/YouTube.js/issues/1146
-      player_id: "251ca12e",
     });
   }
   return instance;
@@ -62,25 +100,26 @@ export const searchTracksInnertube = async (
   });
 
   const items = response.videos
-    .filter(
-      (
-        v
-      ): v is Exclude<
-        typeof v,
+    .map((node): Track | null => {
+      if (node.is(YTNodes.LockupView)) {
+        return node.content_type === "VIDEO" ? lockupToTrack(node) : null;
+      }
+      if (!("id" in node && "author" in node)) return null;
+      const v = node as Exclude<
+        typeof node,
         | ReelItem
         | PlaylistPanelVideo
         | WatchCardCompactVideo
         | ShortsLockupView
-      > => "id" in v && "author" in v
-    )
-    .map(
-      (v): Track => ({
+      >;
+      return {
         apiId: v.id,
         name: v.title.toString(),
         duration: getDurationSeconds(v.duration),
         images: v.thumbnails.map((t) => ({ url: t.url })),
-      })
-    );
+      };
+    })
+    .filter(isDefined);
 
   const pageInfo: PageInfo = {
     resultsPerPage: items.length,
@@ -117,14 +156,23 @@ export const searchPlaylistsInnertube = async (
   });
 
   const items = response.playlists
-    .filter((p): p is Exclude<typeof p, LockupView> => "id" in p && "title" in p)
-    .map(
-      (p): PlaylistInfo => ({
+    .map((p): PlaylistInfo | null => {
+      if (p.is(YTNodes.LockupView)) {
+        if (p.content_type !== "PLAYLIST") return null;
+        return {
+          apiId: p.content_id,
+          name: p.metadata?.title.toString() ?? "",
+          images: getLockupImages(p),
+        };
+      }
+      if (!("id" in p && "title" in p)) return null;
+      return {
         apiId: p.id,
         name: p.title.toString(),
         images: p.thumbnails.map((t) => ({ url: t.url })),
-      })
-    );
+      };
+    })
+    .filter(isDefined);
 
   const pageInfo: PageInfo = {
     resultsPerPage: items.length,
@@ -155,25 +203,26 @@ export const getPlaylistTracksInnertube = async (
   const feed = await youtube.getPlaylist(request.apiId);
 
   const items = feed.items
-    .filter(
-      (
-        v
-      ): v is Exclude<
-        typeof v,
+    .map((node): Track | null => {
+      if (node.is(YTNodes.LockupView)) {
+        return node.content_type === "VIDEO" ? lockupToTrack(node) : null;
+      }
+      if (!("id" in node && "author" in node)) return null;
+      const v = node as Exclude<
+        typeof node,
         | ReelItem
         | PlaylistPanelVideo
         | WatchCardCompactVideo
         | ShortsLockupView
-      > => "id" in v && "author" in v
-    )
-    .map(
-      (v): Track => ({
+      >;
+      return {
         apiId: v.id,
         name: v.title.toString(),
         duration: getDurationSeconds(v.duration),
         images: v.thumbnails.map((t) => ({ url: t.url })),
-      })
-    );
+      };
+    })
+    .filter(isDefined);
 
   const pageInfo: PageInfo = {
     resultsPerPage: items.length,
@@ -208,25 +257,26 @@ export const getTopItemsInnertube = async (): Promise<SearchAllResult> => {
   const home = await youtube.getHomeFeed();
 
   const items = home.videos
-    .filter(
-      (
-        v
-      ): v is Exclude<
-        typeof v,
+    .map((node): Track | null => {
+      if (node.is(YTNodes.LockupView)) {
+        return node.content_type === "VIDEO" ? lockupToTrack(node) : null;
+      }
+      if (!("thumbnails" in node && "author" in node)) return null;
+      const v = node as Exclude<
+        typeof node,
         | ReelItem
         | PlaylistPanelVideo
         | WatchCardCompactVideo
         | ShortsLockupView
-      > => "thumbnails" in v && "author" in v
-    )
-    .map(
-      (v): Track => ({
+      >;
+      return {
         apiId: v.id,
         name: v.title.toString(),
         duration: getDurationSeconds(v.duration),
         images: v.thumbnails.map((t) => ({ url: t.url })),
-      })
-    );
+      };
+    })
+    .filter(isDefined);
 
   return {
     tracks: {
