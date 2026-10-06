@@ -8,7 +8,7 @@ import shaka from "shaka-player/dist/shaka-player.ui";
 import { SabrStreamingAdapter } from "googlevideo/sabr-streaming-adapter";
 import { ShakaPlayerAdapter } from "./ShakaPlayerAdapter";
 import { getSabrInfoInnertube, reloadPlayerResponse, getInnertube } from "./innertube-api";
-import { getPoToken } from "./po-token";
+import { generateColdStartPoToken } from "./po-token";
 
 /**
  * Create a fetch function that routes through application.networkRequest
@@ -52,6 +52,28 @@ export enum PlaybackState {
   ERROR = "error",
 }
 
+/** Where proof-of-origin tokens for this plugin are minted. */
+const YOUTUBE_ORIGIN = "https://www.youtube.com";
+
+/**
+ * How long playback may go without progressing before it is treated as failed.
+ * SABR backs off for a few seconds between requests, so this has to be well
+ * above that.
+ */
+export const STALL_TIMEOUT_MS = 20_000;
+
+/**
+ * Stalled tracks in a row after which the player stops skipping to the next
+ * one, so a queue on repeat that YouTube won't serve doesn't cycle forever.
+ */
+export const MAX_CONSECUTIVE_STALLS = 3;
+
+const formatTime = (seconds: number): string => {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+};
+
 /**
  * Player event callbacks
  */
@@ -75,6 +97,12 @@ export class SabrAudioPlayer {
   private currentTrack: Track | null = null;
   private state: PlaybackState = PlaybackState.IDLE;
   private callbacks: SabrPlayerCallbacks = {};
+  private stallTimer: ReturnType<typeof setInterval> | null = null;
+  private lastProgressTime = 0;
+  private lastProgressAt = 0;
+  private consecutiveStalls = 0;
+  // Where playback stalled, so resume can load the track again from there
+  private stalledAt: { track: Track; time: number } | null = null;
 
   constructor(callbacks: SabrPlayerCallbacks = {}) {
     this.callbacks = callbacks;
@@ -108,6 +136,7 @@ export class SabrAudioPlayer {
     // Stop any current playback
     this.stop();
 
+    this.stalledAt = null;
     this.currentTrack = track;
     this.setState(PlaybackState.LOADING);
 
@@ -157,6 +186,7 @@ export class SabrAudioPlayer {
 
     // Ended handler
     this.audio.addEventListener("ended", () => {
+      this.consecutiveStalls = 0;
       this.setState(PlaybackState.ENDED);
       this.callbacks.onEnded?.();
       application.endTrack();
@@ -209,17 +239,36 @@ export class SabrAudioPlayer {
       clientInfo,
     });
 
-    // Register PO token callback — called with no args, returns PO token string
-    this.sabrAdapter.onMintPoToken(async () => {
+    // PO tokens. Requests start with a cold start token, which YouTube honours
+    // for about a minute of most videos, while the app mints a full one on
+    // youtube.com. Once that arrives, every later request uses it: YouTube
+    // expects the token to change at most once. Without minting (no extension,
+    // or a platform that lacks it) the cold token is all there is, and the
+    // stall watchdog reports where YouTube stops.
+    const coldToken = (async () => {
       try {
         const youtube = await getInnertube();
         const visitorData = youtube.session?.context?.client?.visitorData ?? "";
-        return await getPoToken(visitorData, true);
+        return generateColdStartPoToken(visitorData);
       } catch (error) {
-        console.warn("Failed to mint PO token:", error);
+        console.warn("Failed to make a cold start PO token:", error);
         return "";
       }
-    });
+    })();
+    let mintedToken: string | undefined;
+    application.mintPoToken(YOUTUBE_ORIGIN, track.apiId).then(
+      (token) => {
+        mintedToken = token;
+      },
+      (error) => {
+        console.warn(
+          "PO token minting is not available:",
+          error?.message ?? error
+        );
+      }
+    );
+    // Called with no args before every request
+    this.sabrAdapter.onMintPoToken(async () => mintedToken ?? (await coldToken));
 
     // Register reload player response callback
     // Called with reloadPlaybackContext, must update adapter state and resolve
@@ -250,6 +299,66 @@ export class SabrAudioPlayer {
     // Start playback
     await this.audio.play();
     this.setState(PlaybackState.PLAYING);
+    this.startStallWatch();
+  }
+
+  /**
+   * SABR can stop sending media without any error reaching the audio element
+   * or Shaka (e.g. when YouTube wants attestation), which leaves the track
+   * silently frozen. Treat a long enough lack of progress as a failure.
+   */
+  private startStallWatch(): void {
+    this.stopStallWatch();
+    this.markProgress();
+    this.stallTimer = setInterval(() => {
+      const audio = this.audio;
+      if (!audio || this.state !== PlaybackState.PLAYING || audio.paused) {
+        this.markProgress();
+        return;
+      }
+      if (audio.currentTime !== this.lastProgressTime) {
+        this.markProgress();
+        return;
+      }
+      if (Date.now() - this.lastProgressAt >= STALL_TIMEOUT_MS) {
+        this.onStall();
+      }
+    }, 1000);
+  }
+
+  private stopStallWatch(): void {
+    if (this.stallTimer) {
+      clearInterval(this.stallTimer);
+      this.stallTimer = null;
+    }
+  }
+
+  private markProgress(): void {
+    this.lastProgressTime = this.audio?.currentTime ?? 0;
+    this.lastProgressAt = Date.now();
+  }
+
+  private onStall(): void {
+    const track = this.currentTrack;
+    const time = this.audio?.currentTime ?? 0;
+    this.stop();
+    if (!track) return;
+
+    this.stalledAt = { track, time };
+    this.consecutiveStalls++;
+    this.setState(PlaybackState.ERROR);
+    const error = new Error(
+      `YouTube stopped sending audio at ${formatTime(time)}`
+    );
+    this.callbacks.onError?.(error);
+    // The app's onPlay request only carries the apiId, not the name
+    application.createNotification({
+      type: "error",
+      message: track.name ? `${track.name}: ${error.message}` : error.message,
+    });
+    if (this.consecutiveStalls < MAX_CONSECUTIVE_STALLS) {
+      application.endTrack();
+    }
   }
 
   /**
@@ -269,6 +378,12 @@ export class SabrAudioPlayer {
     if (this.audio && this.state === PlaybackState.PAUSED) {
       await this.audio.play();
       this.setState(PlaybackState.PLAYING);
+    } else if (this.stalledAt) {
+      // The stream is gone, so load the track again from where it stopped
+      const { track, time } = this.stalledAt;
+      if (await this.playTrack(track)) {
+        this.seek(time);
+      }
     }
   }
 
@@ -279,6 +394,7 @@ export class SabrAudioPlayer {
   seek(time: number): void {
     if (this.audio) {
       this.audio.currentTime = time;
+      this.markProgress();
     }
   }
 
@@ -304,6 +420,8 @@ export class SabrAudioPlayer {
    * Stop playback and clean up all resources
    */
   stop(): void {
+    this.stopStallWatch();
+
     // Dispose SABR adapter
     if (this.sabrAdapter) {
       this.sabrAdapter.dispose();
@@ -354,13 +472,9 @@ let playerInstance: SabrAudioPlayer | null = null;
  */
 export const getPlayer = (): SabrAudioPlayer => {
   if (!playerInstance) {
+    // The player reports time and track end to the application itself; doing
+    // it here too would call endTrack twice and skip a track.
     playerInstance = new SabrAudioPlayer({
-      onTimeUpdate: (currentTime, _duration) => {
-        application.setTrackTime(currentTime);
-      },
-      onEnded: () => {
-        application.endTrack();
-      },
       onError: (error) => {
         console.error("SABR Player error:", error);
       },
