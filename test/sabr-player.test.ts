@@ -1,6 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach, vi } from "vitest";
 import { mockApplication } from "./mock-application";
 import { SabrStreamingAdapter } from "googlevideo/sabr-streaming-adapter";
+import { getSabrInfoInnertube } from "../src/innertube-api";
 import {
   SabrAudioPlayer,
   PlaybackState,
@@ -535,6 +536,78 @@ describe("SabrAudioPlayer", () => {
       expect(player.getState()).toBe(PlaybackState.PLAYING);
       expect(player.getCurrentTrack()).toBe(track);
       expect(player.getAudioElement()?.currentTime).toBe(69.5);
+    });
+  });
+
+  describe("overlapping playTrack calls", () => {
+    const first: Track = { apiId: "first-id", name: "First", duration: 180 };
+    const second: Track = { apiId: "second-id", name: "Second", duration: 180 };
+
+    const deferred = <T,>() => {
+      let resolve!: (value: T) => void;
+      let reject!: (error: unknown) => void;
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+
+    test("should drop a load replaced while fetching SABR info", async () => {
+      const sabrInfo = await vi.mocked(getSabrInfoInnertube)("x");
+      const firstInfo = deferred<typeof sabrInfo>();
+      vi.mocked(getSabrInfoInnertube).mockReturnValueOnce(firstInfo.promise);
+      const onError = vi.fn();
+      const player = new SabrAudioPlayer({ onError });
+
+      const firstPlay = player.playTrack(first);
+      expect(await player.playTrack(second)).toBe(true);
+      const secondAudio = player.getAudioElement();
+
+      firstInfo.resolve(sabrInfo);
+      expect(await firstPlay).toBe(false);
+
+      expect(player.getCurrentTrack()).toBe(second);
+      expect(player.getState()).toBe(PlaybackState.PLAYING);
+      expect(player.getAudioElement()).toBe(secondAudio);
+      // Only the second load built an audio element
+      expect(
+        vi.mocked(document.createElement).mock.calls.filter(([tag]) => tag === "audio")
+      ).toHaveLength(1);
+      expect(onError).not.toHaveBeenCalled();
+    });
+
+    test("should not report an error for a load torn down mid-way", async () => {
+      const firstLoad = deferred<void>();
+      mockShakaPlayer.load.mockReturnValueOnce(firstLoad.promise);
+      const onError = vi.fn();
+      const player = new SabrAudioPlayer({ onError });
+
+      const firstPlay = player.playTrack(first);
+      // Let the first load reach player.load
+      await vi.waitFor(() => expect(mockShakaPlayer.load).toHaveBeenCalledTimes(1));
+      expect(await player.playTrack(second)).toBe(true);
+
+      // Shaka rejects a load whose player was destroyed
+      firstLoad.reject(new Error("Load interrupted"));
+      expect(await firstPlay).toBe(false);
+
+      expect(player.getCurrentTrack()).toBe(second);
+      expect(player.getState()).toBe(PlaybackState.PLAYING);
+      expect(onError).not.toHaveBeenCalled();
+    });
+
+    test("should ignore events from a replaced track's audio element", async () => {
+      const player = new SabrAudioPlayer();
+      await player.playTrack(first);
+      const firstAudio = player.getAudioElement() as any;
+      await player.playTrack(second);
+
+      firstAudio.dispatchEvent("ended");
+      firstAudio.dispatchEvent("error");
+
+      expect(application.endTrack).not.toHaveBeenCalled();
+      expect(player.getState()).toBe(PlaybackState.PLAYING);
     });
   });
 

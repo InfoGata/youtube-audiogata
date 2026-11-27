@@ -75,6 +75,17 @@ const formatTime = (seconds: number): string => {
 };
 
 /**
+ * Thrown inside a load that a newer playTrack or a stop has replaced, to
+ * abandon it without reporting an error for a track nobody is playing.
+ */
+class SupersededLoadError extends Error {
+  constructor() {
+    super("Load superseded by a newer one");
+    this.name = "SupersededLoadError";
+  }
+}
+
+/**
  * Player event callbacks
  */
 export interface SabrPlayerCallbacks {
@@ -103,6 +114,9 @@ export class SabrAudioPlayer {
   private consecutiveStalls = 0;
   // Where playback stalled, so resume can load the track again from there
   private stalledAt: { track: Track; time: number } | null = null;
+  // Bumped by every stop(), so a load can tell it has been replaced while it
+  // was waiting on the network and leave the newer track's state alone.
+  private loadGeneration = 0;
 
   constructor(callbacks: SabrPlayerCallbacks = {}) {
     this.callbacks = callbacks;
@@ -133,17 +147,26 @@ export class SabrAudioPlayer {
    * Play a track using SABR streaming via Shaka Player
    */
   async playTrack(track: Track): Promise<boolean> {
-    // Stop any current playback
+    // Stop any current playback, including a load still in progress
     this.stop();
+    const generation = this.loadGeneration;
 
     this.stalledAt = null;
     this.currentTrack = track;
     this.setState(PlaybackState.LOADING);
 
     try {
-      await this.initShakaPlayback(track);
+      await this.initShakaPlayback(track, generation);
       return true;
     } catch (error) {
+      // Replaced while loading (e.g. skipping quickly): the newer call owns
+      // the player now, so this one reports nothing.
+      if (
+        error instanceof SupersededLoadError ||
+        generation !== this.loadGeneration
+      ) {
+        return false;
+      }
       console.error("Playback error:", error);
       this.setState(PlaybackState.ERROR);
       this.callbacks.onError?.(
@@ -156,13 +179,25 @@ export class SabrAudioPlayer {
   /**
    * Initialize Shaka Player with SabrStreamingAdapter
    */
-  private async initShakaPlayback(track: Track): Promise<void> {
+  private async initShakaPlayback(
+    track: Track,
+    generation: number
+  ): Promise<void> {
     if (!track.apiId) {
       throw new Error("Track does not have a valid API ID");
     }
 
+    // Each await below can outlast a newer playTrack, whose stop() has then
+    // torn down whatever this load had set up; stop before touching anything.
+    const ensureCurrent = () => {
+      if (generation !== this.loadGeneration) {
+        throw new SupersededLoadError();
+      }
+    };
+
     // Get SABR info from Innertube (includes DASH manifest)
     const sabrInfo = await getSabrInfoInnertube(track.apiId);
+    ensureCurrent();
     if (!sabrInfo) {
       throw new Error("Failed to retrieve SABR info for track: " + track.apiId);
     }
@@ -171,21 +206,25 @@ export class SabrAudioPlayer {
     shaka.polyfill.installAll();
 
     // Create audio element
-    this.audio = document.createElement("audio");
-    this.audio.crossOrigin = "anonymous";
+    const audio = document.createElement("audio");
+    audio.crossOrigin = "anonymous";
+    this.audio = audio;
+    // stop() empties a replaced element's src, which can still fire events;
+    // they belong to a track that is gone.
+    const isCurrentAudio = () => this.audio === audio;
 
     // Time update handler
-    this.audio.addEventListener("timeupdate", () => {
-      if (this.audio) {
-        const currentTime = this.audio.currentTime;
-        const duration = this.audio.duration || 0;
-        this.callbacks.onTimeUpdate?.(currentTime, duration);
-        application.setTrackTime(currentTime);
-      }
+    audio.addEventListener("timeupdate", () => {
+      if (!isCurrentAudio()) return;
+      const currentTime = audio.currentTime;
+      const duration = audio.duration || 0;
+      this.callbacks.onTimeUpdate?.(currentTime, duration);
+      application.setTrackTime(currentTime);
     });
 
     // Ended handler
-    this.audio.addEventListener("ended", () => {
+    audio.addEventListener("ended", () => {
+      if (!isCurrentAudio()) return;
       this.consecutiveStalls = 0;
       this.setState(PlaybackState.ENDED);
       this.callbacks.onEnded?.();
@@ -193,18 +232,21 @@ export class SabrAudioPlayer {
     });
 
     // Error handler
-    this.audio.addEventListener("error", (e) => {
+    audio.addEventListener("error", (e) => {
+      if (!isCurrentAudio()) return;
       console.error("Audio element error:", e);
       this.setState(PlaybackState.ERROR);
       this.callbacks.onError?.(new Error("Audio playback error"));
     });
 
     // Create Shaka Player and attach to audio element
-    this.player = new shaka.Player();
-    await this.player.attach(this.audio);
+    const player = new shaka.Player();
+    this.player = player;
+    await player.attach(audio);
+    ensureCurrent();
 
     // Configure Shaka for audio streaming
-    this.player.configure({
+    player.configure({
       abr: {
         enabled: true,
       },
@@ -284,7 +326,7 @@ export class SabrAudioPlayer {
     });
 
     // Attach SABR adapter to Shaka Player
-    this.sabrAdapter.attach(this.player);
+    this.sabrAdapter.attach(player);
 
     // Set streaming URL, ustreamer config, and formats
     this.sabrAdapter.setStreamingURL(sabrInfo.serverAbrStreamingUrl);
@@ -292,12 +334,12 @@ export class SabrAudioPlayer {
     this.sabrAdapter.setServerAbrFormats(sabrInfo.formats);
 
     // Load the DASH manifest
-    await this.player.load(
-      `data:application/dash+xml;base64,${sabrInfo.manifest}`
-    );
+    await player.load(`data:application/dash+xml;base64,${sabrInfo.manifest}`);
+    ensureCurrent();
 
     // Start playback
-    await this.audio.play();
+    await audio.play();
+    ensureCurrent();
     this.setState(PlaybackState.PLAYING);
     this.startStallWatch();
   }
@@ -420,6 +462,7 @@ export class SabrAudioPlayer {
    * Stop playback and clean up all resources
    */
   stop(): void {
+    this.loadGeneration++;
     this.stopStallWatch();
 
     // Dispose SABR adapter
