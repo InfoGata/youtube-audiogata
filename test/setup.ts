@@ -1,12 +1,12 @@
 import { beforeAll } from 'vitest';
 import { application } from './application';
 
-(global as any).application = application;
+(globalThis as any).application = application;
 beforeAll(() => {
   // FIXME https://github.com/jsdom/jsdom/issues/1724
-  global.fetch = fetch;
-  global.Headers = Headers;
-  global.Request = Request;
-  global.Response = Response;
-  global.AbortController = AbortController;
+  globalThis.fetch = fetch;
+  globalThis.Headers = Headers;
+  globalThis.Request = Request;
+  globalThis.Response = Response;
+  globalThis.AbortController = AbortController;
 }); 

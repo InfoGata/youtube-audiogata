@@ -4,7 +4,7 @@ import { canParseUrl } from "../src/index";
 
 // Set up the mock application as the global application
 beforeAll(() => {
-  (global as any).application = mockApplication;
+  (globalThis as any).application = mockApplication;
 });
 
 describe("index", () => {

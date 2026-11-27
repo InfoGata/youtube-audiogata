@@ -17,7 +17,7 @@ import {
 } from "../src/sabr-player";
 
 // Set up global application mock
-(global as any).application = {
+(globalThis as any).application = {
   ...mockApplication,
   setTrackTime: vi.fn(),
   endTrack: vi.fn(),
@@ -202,7 +202,7 @@ class MockAudioElement {
 beforeEach(() => {
   vi.clearAllMocks();
 
-  (global as any).document = {
+  (globalThis as any).document = {
     createElement: vi.fn((tag: string) => {
       if (tag === "audio") {
         return new MockAudioElement();
@@ -395,7 +395,9 @@ describe("SabrAudioPlayer", () => {
 
     /** The token callback the player gave the adapter it last created. */
     const mintCallback = (): (() => Promise<string>) => {
-      const adapter = vi.mocked(SabrStreamingAdapter).mock.results.at(-1)!.value;
+      const adapter = vi.mocked(SabrStreamingAdapter).mock.results[
+        vi.mocked(SabrStreamingAdapter).mock.results.length - 1
+      ].value;
       return adapter.onMintPoToken.mock.calls[0][0];
     };
 
@@ -449,7 +451,7 @@ describe("SabrAudioPlayer", () => {
 
     beforeEach(() => {
       vi.useFakeTimers();
-      (global as any).application.createNotification = vi.fn();
+      (globalThis as any).application.createNotification = vi.fn();
     });
 
     afterEach(() => {
